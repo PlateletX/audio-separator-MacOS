@@ -6,7 +6,7 @@ set "APP=%ROOT%app.pyw"
 set "FFMPEG_PATH_FILE=%ROOT%ffmpeg_path.txt"
 set "FFMPEG_BIN="
 set "SYSTEM_FFMPEG_BIN="
-"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "%ROOT%bootstrap.ps1"
+"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "%ROOT%bootstrap.ps1"
 if %errorlevel% neq 0 (
     echo [ERROR] Deployment failed!
     pause
