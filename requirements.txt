@@ -1,0 +1,14 @@
+# ============================================
+# Project Dependencies (installed by bootstrap.ps1 via pip)
+# ============================================
+# Notes:
+#   - Standard pip packages only. No dependency conflicts here.
+#   - torch / audio-separator / numpy are handled by init_env.py
+#     due to platform-specific or dependency conflict issues.
+# ============================================
+
+# ONNX Runtime GPU (bundles CUDA libs; auto-falls back to CPU if no GPU)
+onnxruntime-gpu==1.17.1
+
+# GUI drag-and-drop support
+tkinterdnd2==0.4.3

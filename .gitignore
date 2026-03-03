@@ -1,0 +1,8 @@
+__pycache__/
+python_env/
+download_checks.json
+_python_extract_temp/
+requirements_processed.txt
+ffmpeg_path.txt
+*.tar.gz
+*.ckpt
