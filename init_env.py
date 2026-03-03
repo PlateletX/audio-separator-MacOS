@@ -18,6 +18,8 @@ import subprocess
 import shutil
 import zipfile
 import urllib.request
+import urllib.error
+import ssl
 
 # ============ Project-specific config ============
 # PyTorch versions
@@ -75,6 +77,28 @@ def _to_hf_mirror_url(url: str) -> str:
     return resolve_url.replace("https://huggingface.co", "https://hf-mirror.com")
 
 
+def _download_file(url: str, target_path: str, timeout: int = 120):
+    """Download file with SSL fallback for some Windows machines lacking CA chain."""
+    req = urllib.request.Request(
+        url,
+        headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"},
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp, open(target_path, "wb") as f:
+            shutil.copyfileobj(resp, f)
+        return
+    except urllib.error.URLError as e:
+        is_cert_error = isinstance(e.reason, ssl.SSLCertVerificationError)
+        if not is_cert_error:
+            raise
+        print("    SSL certificate verify failed, retrying without certificate verification...")
+
+    insecure_ctx = ssl._create_unverified_context()
+    with urllib.request.urlopen(req, timeout=timeout, context=insecure_ctx) as resp, open(target_path, "wb") as f:
+        shutil.copyfileobj(resp, f)
+
+
 def ensure_model_files():
     """Ensure required model files exist in project root; download if missing."""
     for filename, source_urls in MODEL_FILES.items():
@@ -95,7 +119,7 @@ def ensure_model_files():
         for url in urls:
             print(f"    Source: {url}")
             try:
-                urllib.request.urlretrieve(url, local_path)
+                _download_file(url, local_path)
                 if os.path.getsize(local_path) == 0:
                     raise RuntimeError("Downloaded empty file")
                 downloaded = True
@@ -150,7 +174,7 @@ def ensure_ffmpeg():
     for url in FFMPEG_DOWNLOAD_URLS:
         print(f"    Source: {url}")
         try:
-            urllib.request.urlretrieve(url, archive_local)
+            _download_file(url, archive_local)
             if os.path.getsize(archive_local) < 10 * 1024 * 1024:
                 raise RuntimeError("Downloaded archive too small, likely an error page")
             downloaded = True
