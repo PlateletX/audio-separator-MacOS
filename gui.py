@@ -246,7 +246,7 @@ class AudioSplitterGUI:
                 vram_gb = torch.cuda.get_device_properties(0).total_memory / (1024**3)
                 info += f"NVIDIA {device_name} // {vram_gb:.1f} GB VRAM // CUDA 启用 ✅"
             else:
-                info += "仅 CPU 运行 ❌ (未检测到 CUDA，推理将极为缓慢)"
+                info += "仅 CPU 运行 ❌ (未检测到Nvidia GPU或CUDA，将花费较长时间处理！)"
         
         self.root.after(0, lambda: self.hardware_info.set(info))
 

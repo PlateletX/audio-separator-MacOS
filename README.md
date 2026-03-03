@@ -1,4 +1,5 @@
-一个为 Windows 用户设计的极简音频分离工具，内置当前 SOTA 级别的 **BS-Rofo-SW-Fixed** 六轨分离模型。
+顶级六轨分离模型**BS-Rofo-SW-Fixed**的简易GUI免部署启动器。
+可高质量分离歌曲为 piano、guitar、bass、drum、vocal、other（弦乐或效果器等其他元素）
 
 ---
 
