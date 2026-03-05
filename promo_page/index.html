@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BS-Rofo-SW-Fixed 录屏专用</title>
+    <link rel="stylesheet" href="style.css">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Noto+Sans+SC:wght@400;700;900&display=swap"
+        rel="stylesheet">
+</head>
+
+<body>
+
+    <!-- 动态背景 -->
+    <div class="bg-glow glow-1"></div>
+    <div class="bg-glow glow-2"></div>
+    <div class="audio-waves">
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+    </div>
+
+    <div id="slides-container">
+
+        <!-- Slide 1: 硬核开篇 -->
+        <div class="slide slide-active">
+            <div class="content-center">
+                <h3 class="top-subtitle gradient-text delay-1 animate-element">免费 · 最强 · 无需部署</h3>
+                <h1 class="giant-txt text-glow delay-2 animate-element" style="margin: 20px 0;">AI 音乐六轨分离</h1>
+                <h2 class="bottom-desc delay-3 animate-element">钢琴 / 吉他 / 贝斯 / 鼓 / 人声 / 弦乐...</h2>
+            </div>
+        </div>
+
+        <!-- Slide 2: 硬核科普 - BS-RoFormer 架构深度解析 -->
+        <div class="slide">
+            <div class="content-split-tech">
+                <div class="tech-header delay-1 animate-element">
+                    <h1 class="side-title gradient-text">BS-RoFormer 核心架构解析</h1>
+                    <p class="tech-subtitle">Band-Split RoPE Transformer: 音频分离领域的 SOTA 巅峰</p>
+                </div>
+
+                <div class="tech-grid">
+                    <!-- 模块一 -->
+                    <div class="tech-card glass-panel delay-2 animate-element">
+                        <div class="card-num">01</div>
+                        <h3>频带分割 (Band-Split)</h3>
+                        <p>将复数 Spectrogram 沿频率轴切分为多个互不重叠的子带。通过独立的线性层映射，实现对低频基频与高频泛音特征的精准捕获，符合音频物理特性。</p>
+                    </div>
+
+                    <!-- 模块二 -->
+                    <div class="tech-card glass-panel delay-3 animate-elementHighlight">
+                        <div class="card-num">02</div>
+                        <h3>层次化 Transformer 块</h3>
+                        <ul>
+                            <li><strong>Time-Transformer</strong>：对子带内时间序列建模，捕获节奏与时域变化。</li>
+                            <li><strong>Subband-Transformer</strong>：跨频带信息交互，重构复杂谐波。</li>
+                            <li><strong>RoPE (旋转位置编码)</strong>：引入 LLM 核心技术，提升长音频处理的稳定性与外推性。</li>
+                        </ul>
+                    </div>
+
+                    <!-- 模块三 -->
+                    <div class="tech-card glass-panel delay-4 animate-element">
+                        <div class="card-num">03</div>
+                        <h3>多带掩码估计与演进</h3>
+                        <p>通过 Multi-band Mask Estimation 还原原始频谱；后续更有 Mel-Band 对感知维度的优化以及 v2 版本的参数规模飞跃，SDR 指标显著领先。</p>
+                    </div>
+
+                    <!-- 排名展示 -->
+                    <div class="tech-rank-card glass-panel delay-5 animate-element">
+                        <div class="rank-info">
+                            <h3>榜单表现</h3>
+                            <p>在 MUSDB18-HQ 与 MDX23 挑战赛中频频霸榜，相比 Demucs 或 BSRNN 提升 1-2 dB SDR。</p>
+                        </div>
+                        <img src="rank.png" class="rank-img-mini">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 3: 软件纯粹特性 -->
+        <div class="slide">
+            <div class="content-center full-width delay-1 animate-element">
+                <h1 class="main-title" style="margin-bottom: 60px;">纯粹 · 强大 · 极客专属 GUI</h1>
+
+                <div class="app-display-area">
+                    <div class="app-tags left-tags">
+                        <div class="tech-tag delay-2 animate-element"><span class="dot"></span>无需代理环境</div>
+                        <div class="tech-tag delay-3 animate-element"><span class="dot"></span>自动部署依赖</div>
+                    </div>
+
+                    <div class="app-image-wrap glass-panel delay-1 animate-element">
+                        <img src="app.png" class="app-img">
+                    </div>
+
+                    <div class="app-tags right-tags">
+                        <div class="tech-tag delay-4 animate-element"><span class="dot"></span>一键直达启动</div>
+                        <div class="tech-tag delay-5 animate-element"><span class="dot"></span>极致零门槛操作</div>
+                    </div>
+                </div>
+
+                <!-- 硬件性能要求说明 -->
+                <div class="hardware-req delay-5 animate-element"
+                    style="margin-top: 50px; padding: 20px 40px; border-top: 1px solid rgba(0, 230, 118, 0.2); display: inline-block;">
+                    <p style="font-size: 1.2rem; color: rgba(255,255,255,0.7); font-family: monospace;">
+                        <strong style="color: var(--accent-color);">[ 极致性能释放 ]</strong>
+                        &nbsp;&nbsp;全面支持 N 卡加速运行 (推荐 GTX 700 系及以上架构)
+                        &nbsp;&nbsp;|&nbsp;&nbsp;
+                        兼容纯 CPU 解算
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 4: 无缝音频对比控制台 -->
+        <div class="slide" id="audio-slide">
+            <div class="content-center full-width">
+                <h1 class="main-title delay-1 animate-element">音质优势</h1>
+                <p class="side-desc delay-1 animate-element" style="margin-bottom: 30px; text-align: center;">
+                    请佩戴耳机聆听</p>
+                <!-- 音频对比控制台 -->
+                <div class="audio-console glass-panel delay-2 animate-element" id="audio-console-wrap">
+                    <div class="console-header">
+                        <button id="play-pause-btn" class="play-btn">▶ 播放音频</button>
+                        <div class="time-display"><span id="current-time">0:00</span> / <span
+                                id="total-time">0:00</span></div>
+                        <div class="progress-bar-container" id="progress-container">
+                            <div class="progress-bar" id="progress-bar"></div>
+                        </div>
+                    </div>
+
+                    <div class="console-body">
+                        <!-- 轨道选择器 -->
+                        <div class="track-selector">
+                            <h3 class="track-title">🔊 音轨试听对比</h3>
+                            <div class="track-buttons">
+                                <button class="track-btn active" data-track="vocals">🎤 人声区 (Vocal)</button>
+                                <button class="track-btn" data-track="bass">🎸 贝斯低频 (Bass)</button>
+                                <button class="track-btn" data-track="drums">🥁 鼓组律动 (Drum)</button>
+                                <button class="track-btn" data-track="guitar">🎸 吉他中频 (Guitar)</button>
+                                <button class="track-btn" data-track="piano">🎹 钢琴宽频 (Piano)</button>
+                                <button class="track-btn" data-track="other">🎻 弦乐混响 (Other)</button>
+                            </div>
+                            <div class="now-playing-info">
+                                正在播放：<br><span id="track-name-display" class="gradient-text"
+                                    style="font-family: monospace;">1_トゲナシトゲアリ - 雑踏、僕らの街 (OP)</span>
+                            </div>
+                        </div>
+
+                        <!-- A/B 切换器 -->
+                        <div class="ab-switcher">
+                            <h3 class="track-title">🎚️ 渲染基底即时切换 (A/B)</h3>
+                            <div class="switcher-buttons">
+                                <button id="btn-model-a" class="model-btn switch-a active">
+                                    <span class="model-name">HTDemucs_6s</span>
+                                    <span class="model-desc">UVR5 默认最强方案</span>
+                                    <div class="playing-indicator">
+                                        <div class="wave"></div>
+                                        <div class="wave"></div>
+                                        <div class="wave"></div>
+                                    </div>
+                                </button>
+                                <button id="btn-model-b" class="model-btn switch-b">
+                                    <span class="model-name">BS-Rofo-SW-Fixed</span>
+                                    <span class="model-desc">当前SOTA方案</span>
+                                    <div class="playing-indicator">
+                                        <div class="wave"></div>
+                                        <div class="wave"></div>
+                                        <div class="wave"></div>
+                                    </div>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 5: 全局联动工业流 (YourMT3+) -->
+        <div class="slide">
+            <div class="content-split-tech">
+                <div class="tech-header delay-1 animate-element">
+                    <h1 class="side-title gradient-text">拓展实现：全自动 MIDI 扒谱工业流</h1>
+                    <p class="tech-subtitle">多轨分离，以大幅提升 YourMT3+ 最强的准确率，提升九成以上扒谱效率</p>
+                </div>
+
+                <div class="tech-grid">
+                    <!-- 模块一 -->
+                    <div class="tech-card glass-panel delay-2 animate-element">
+                        <div class="card-num">01</div>
+                        <h3>自动识别多种乐器转换为MIDI音频</h3>
+                        <p>由伦敦玛丽女王大学研发的最新顶级开源项目 <strong>YourMT3+</strong>。<br>在处理复杂混合音轨、多乐器识别方面已达业内顶级水平。</p>
+                    </div>
+
+                    <!-- 模块二 -->
+                    <div class="tech-card glass-panel delay-3 animate-elementHighlight">
+                        <div class="card-num">02</div>
+                        <h3>全新 Transformer 架构基因</h3>
+                        <ul>
+                            <li><strong>分层注意力</strong>：精准捕获时频长程依赖。</li>
+                            <li><strong>Moe架构</strong>：针对不同乐器特征自动分配独立专家。</li>
+                            <li><strong>多通道解码器</strong>：将乐器分派到独立 MIDI 通道，拒绝串轨。</li>
+                        </ul>
+                    </div>
+
+                    <!-- 模块三 -->
+                    <div class="tech-card glass-panel delay-4 animate-element">
+                        <div class="card-num">03</div>
+                        <h3>全元素支持</h3>
+                        <p>支持 128 种全谱系 GM 乐器以及人声。</p>
+                    </div>
+
+                    <!-- 联动总结 -->
+                    <div class="tech-rank-card glass-panel delay-5 animate-element"
+                        style="justify-content: center; text-align: center; border-color: rgba(0, 230, 118, 0.4); background: rgba(0, 230, 118, 0.05); padding: 30px;">
+                        <div>
+                            <h3 style="font-size: 2rem; color: #fff; margin-bottom: 15px;">BS-RoFormer <span
+                                    style="color: var(--accent-color);">+</span> YourMT3+</h3>
+                            <p style="font-size: 1.4rem; color: rgba(255,255,255,0.8);">
+                                YourMT3+ 在处理原始多轨音源时，精确率会大幅下降至30%左右。<br>
+                                结合本工具，预分离音源后，可使单轨精确率达到 <strong
+                                    style="color: var(--accent-color); font-size: 1.8rem;">90%</strong>
+                                以上。你只需要调整不到10%的音符，即可完成扒谱工作。
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 6: 极简化尾页，拒绝营销套路 -->
+        <div class="slide">
+            <div class="content-center">
+                <h1 class="main-title delay-1 animate-element"
+                    style="border-bottom: 2px solid var(--accent-color); padding-bottom: 20px; display: inline-block;">
+                    开源造福社区 · 工具回归纯粹</h1>
+
+                <div class="step-guide delay-2 animate-element glass-panel">
+                    <h2 class="sub-headline" style="color: #fff; margin-bottom: 40px;">获取与运行指引：</h2>
+                    <ol class="cool-list">
+                        <li><span>01.</span> 点击 <strong>[置顶评论区 / 视频简介]</strong> 处链接</li>
+                        <li><span>02.</span> 点击<strong>克隆/下载按钮</strong>下载ZIP</li>
+                        <li><span>03.</span> 直接解压，双击根目录下 <strong>[一键启动GUI.bat]</strong> 即可运行</li>
+                    </ol>
+                </div>
+
+                <p class="bottom-desc delay-3 animate-element" style="margin-top: 50px;">
+                    ▶ 运行期间如有 BUG 报错或环境冲突，请带上截图于评论区反馈。<br><br>
+                    <span style="font-size: 1.2rem; display: block; margin-top: 20px; font-family: monospace;">
+                        * 欲体验 YourMT3+ 请查阅 GitHub：mimbres/YourMT3<br>
+                        * 算力及代理限制用户可前往 HuggingFace Spaces 在线试用：https://huggingface.co/spaces/mimbres/YourMT3
+                    </span>
+                </p>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- PPT 操作提示 (录屏时会自动淡出隐藏) -->
+    <div id="controls-hint" class="hint-overlay">
+        [鼠标左键/←/→/空格]: 切换页面 | 极客极简版
+    </div>
+
+    <!-- PPT 逻辑脚本 & 音频控制台逻辑 -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --------- PPT 翻页逻辑 ---------
+            const slides = document.querySelectorAll('.slide');
+            let currentSlide = 0;
+            const hint = document.getElementById('controls-hint');
+
+            setTimeout(() => { hint.style.opacity = '0'; }, 3000);
+
+            function goToSlide(index) {
+                if (index >= 0 && index < slides.length) {
+                    slides[currentSlide].classList.remove('slide-active');
+                    currentSlide = index;
+                    slides[currentSlide].classList.add('slide-active');
+                }
+            }
+
+            document.addEventListener('click', (e) => {
+                if (e.target.closest('#audio-console-wrap')) return;
+                goToSlide(currentSlide + 1);
+            });
+
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowRight' || e.code === 'Space') {
+                    goToSlide(currentSlide + 1);
+                } else if (e.key === 'ArrowLeft') {
+                    goToSlide(currentSlide - 1);
+                }
+            });
+
+            // --------- 音频对轨与无缝切换逻辑 ---------
+            const tracks = {
+                vocals: {
+                    a: '../样品试听/1_トゲナシトゲアリ - 雑踏、僕らの街 (OP)_(Vocals).wav',
+                    b: '../样品试听/トゲナシトゲアリ - 雑踏、僕らの街 (OP)_(vocals)_BS-Rofo-SW-Fixed.flac'
+                },
+                bass: {
+                    a: '../样品试听/1_トゲナシトゲアリ - 雑踏、僕らの街 (OP)_(Bass).wav',
+                    b: '../样品试听/トゲナシトゲアリ - 雑踏、僕らの街 (OP)_(bass)_BS-Rofo-SW-Fixed.flac'
+                },
+                drums: {
+                    a: '../样品试听/1_トゲナシトゲアリ - 雑踏、僕らの街 (OP)_(Drums).wav',
+                    b: '../样品试听/トゲナシトゲアリ - 雑踏、僕らの街 (OP)_(drums)_BS-Rofo-SW-Fixed.flac'
+                },
+                guitar: {
+                    a: '../样品试听/1_トゲナシトゲアリ - 雑踏、僕らの街 (OP)_(Guitar).wav',
+                    b: '../样品试听/トゲナシトゲアリ - 雑踏、僕らの街 (OP)_(guitar)_BS-Rofo-SW-Fixed.flac'
+                },
+                piano: {
+                    a: '../样品试听/1_トゲナシトゲアリ - 雑踏、僕らの街 (OP)_(Piano).wav',
+                    b: '../样品试听/トゲナシトゲアリ - 雑踏、僕らの街 (OP)_(piano)_BS-Rofo-SW-Fixed.flac'
+                },
+                other: {
+                    a: '../样品试听/1_トゲナシトゲアリ - 雑踏、僕らの街 (OP)_(Other).wav',
+                    b: '../样品试听/トゲナシトゲアリ - 雑踏、僕らの街 (OP)_(other)_BS-Rofo-SW-Fixed.flac'
+                }
+            };
+
+            const audioA = new Audio();
+            const audioB = new Audio();
+            let activeModel = 'a';
+            let currentTrackKey = 'vocals';
+
+            function initTrackSource() {
+                const playing = !audioA.paused;
+                const time = audioA.currentTime;
+
+                audioA.src = tracks[currentTrackKey].a;
+                audioB.src = tracks[currentTrackKey].b;
+                updateVolume();
+
+                audioA.load();
+                audioB.load();
+
+                audioA.currentTime = time;
+                audioB.currentTime = time;
+
+                if (playing) {
+                    audioA.play().catch(e => console.log(e));
+                    audioB.play().catch(e => console.log(e));
+                }
+            }
+
+            function updateVolume() {
+                if (activeModel === 'a') {
+                    audioA.volume = 1; audioB.volume = 0;
+                } else {
+                    audioA.volume = 0; audioB.volume = 1;
+                }
+            }
+
+            initTrackSource();
+
+            const playBtn = document.getElementById('play-pause-btn');
+            playBtn.addEventListener('click', () => {
+                if (audioA.paused) {
+                    audioA.play(); audioB.play();
+                    playBtn.innerHTML = '⏸ 暂停';
+                    playBtn.classList.add('playing');
+                } else {
+                    audioA.pause(); audioB.pause();
+                    playBtn.innerHTML = '▶ 播放';
+                    playBtn.classList.remove('playing');
+                }
+            });
+
+            document.querySelectorAll('.track-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    document.querySelectorAll('.track-btn').forEach(b => b.classList.remove('active'));
+                    e.target.classList.add('active');
+                    currentTrackKey = e.target.getAttribute('data-track');
+                    initTrackSource();
+                });
+            });
+
+            const btnA = document.getElementById('btn-model-a');
+            const btnB = document.getElementById('btn-model-b');
+
+            btnA.addEventListener('click', () => {
+                activeModel = 'a';
+                btnB.classList.remove('active');
+                btnA.classList.add('active');
+                updateVolume();
+            });
+            btnB.addEventListener('click', () => {
+                activeModel = 'b';
+                btnA.classList.remove('active');
+                btnB.classList.add('active');
+                updateVolume();
+            });
+
+            const progressContainer = document.getElementById('progress-container');
+            const progressBar = document.getElementById('progress-bar');
+            const currTimeEl = document.getElementById('current-time');
+            const totalTimeEl = document.getElementById('total-time');
+
+            function formatTime(sec) {
+                if (!sec || isNaN(sec)) return "0:00";
+                let m = Math.floor(sec / 60) || 0;
+                let s = Math.floor(sec % 60) || 0;
+                return m + ":" + (s < 10 ? '0' : '') + s;
+            }
+
+            audioA.addEventListener('timeupdate', () => {
+                if (audioA.duration) {
+                    const percent = (audioA.currentTime / audioA.duration) * 100;
+                    progressBar.style.width = percent + '%';
+                    currTimeEl.innerText = formatTime(audioA.currentTime);
+                }
+            });
+
+            audioA.addEventListener('loadedmetadata', () => {
+                totalTimeEl.innerText = formatTime(audioA.duration);
+            });
+
+            progressContainer.addEventListener('click', (e) => {
+                const rect = progressContainer.getBoundingClientRect();
+                const clickX = e.clientX - rect.left;
+                const width = rect.width;
+                const setTime = (clickX / width) * audioA.duration;
+                audioA.currentTime = setTime;
+                audioB.currentTime = setTime;
+            });
+
+            audioA.addEventListener('ended', () => {
+                playBtn.innerHTML = '▶ 实时解码';
+                playBtn.classList.remove('playing');
+            });
+        });
+    </script>
+</body>
+
+</html>

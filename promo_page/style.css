@@ -1,0 +1,799 @@
+:root {
+    --bg-color: #030a06;
+    /* 更深邃无底的黑绿 */
+    --text-main: #a3b5a8;
+    --text-light: #ffffff;
+    --accent-color: #00e676;
+    /* 改为稍微克制一点点但依然发光的原谅绿/极客绿 */
+    --gradient-1: #00e676;
+    --gradient-2: #1de9b6;
+    --panel-bg: rgba(6, 20, 13, 0.6);
+    --panel-border: rgba(0, 230, 118, 0.2);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Inter', 'Noto Sans SC', sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-main);
+    overflow: hidden;
+    width: 100vw;
+    height: 100vh;
+    cursor: default;
+}
+
+/* 背景光斑克制化 */
+.bg-glow {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(200px);
+    z-index: -1;
+    opacity: 0.15;
+    animation: drift 20s infinite alternate ease-in-out;
+}
+
+.glow-1 {
+    width: 800px;
+    height: 800px;
+    background: var(--gradient-1);
+    top: -100px;
+    left: -100px;
+}
+
+.glow-2 {
+    width: 1000px;
+    height: 1000px;
+    background: var(--gradient-2);
+    bottom: -200px;
+    right: -100px;
+    animation-delay: -10s;
+}
+
+/* 音频起伏条 */
+.audio-waves {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 100px;
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    z-index: 0;
+    opacity: 0.1;
+}
+
+.bar {
+    width: 6px;
+    background: linear-gradient(to top, var(--gradient-2), var(--gradient-1));
+    border-radius: 3px 3px 0 0;
+    animation: sound 1.5s ease-in-out infinite alternate;
+}
+
+.bar:nth-child(1) {
+    animation-delay: 0.1s;
+    height: 30px;
+}
+
+.bar:nth-child(2) {
+    animation-delay: 0.4s;
+    height: 60px;
+}
+
+.bar:nth-child(3) {
+    animation-delay: 0.2s;
+    height: 40px;
+}
+
+.bar:nth-child(4) {
+    animation-delay: 0.6s;
+    height: 80px;
+}
+
+.bar:nth-child(5) {
+    animation-delay: 0.3s;
+    height: 50px;
+}
+
+.bar:nth-child(6) {
+    animation-delay: 0.7s;
+    height: 90px;
+}
+
+.bar:nth-child(7) {
+    animation-delay: 0.2s;
+    height: 35px;
+}
+
+.bar:nth-child(8) {
+    animation-delay: 0.5s;
+    height: 75px;
+}
+
+.bar:nth-child(9) {
+    animation-delay: 0.8s;
+    height: 45px;
+}
+
+.bar:nth-child(10) {
+    animation-delay: 0.4s;
+    height: 65px;
+}
+
+/* ---------- 硬核科普页专有排版 ---------- */
+.content-split-tech {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 1400px;
+    height: 100%;
+    justify-content: center;
+}
+
+.tech-header {
+    margin-bottom: 40px;
+    border-left: 6px solid var(--accent-color);
+    padding-left: 30px;
+}
+
+.tech-subtitle {
+    font-size: 1.5rem;
+    color: var(--text-main);
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    margin-top: 10px;
+}
+
+.tech-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: auto auto;
+    gap: 25px;
+}
+
+.tech-card {
+    padding: 30px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+}
+
+.tech-card.animate-elementHighlight {
+    border-color: var(--accent-color);
+    background: rgba(0, 230, 118, 0.08);
+}
+
+.card-num {
+    position: absolute;
+    top: 15px;
+    right: 20px;
+    font-family: monospace;
+    font-size: 3rem;
+    font-weight: 900;
+    opacity: 0.1;
+    color: var(--accent-color);
+}
+
+.tech-card h3 {
+    font-size: 1.8rem;
+    color: var(--text-light);
+    margin-bottom: 15px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 10px;
+}
+
+.tech-card p {
+    font-size: 1.1rem;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.tech-card ul {
+    list-style: none;
+    margin-top: 10px;
+}
+
+.tech-card ul li {
+    font-size: 1.1rem;
+    margin-bottom: 10px;
+    padding-left: 20px;
+    position: relative;
+}
+
+.tech-card ul li::before {
+    content: "■";
+    position: absolute;
+    left: 0;
+    color: var(--accent-color);
+    font-size: 0.8rem;
+    top: 5px;
+}
+
+.tech-card ul li strong {
+    color: var(--accent-color);
+}
+
+/* 排名卡片占位 */
+.tech-rank-card {
+    grid-column: span 3;
+    display: flex;
+    align-items: center;
+    gap: 40px;
+    padding: 20px 40px;
+}
+
+.rank-info {
+    flex: 1;
+}
+
+.rank-img-mini {
+    flex: 1.5;
+    height: 220px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 1px solid rgba(0, 230, 118, 0.3);
+    box-shadow: 0 0 20px rgba(0, 230, 118, 0.2);
+}
+
+@keyframes sound {
+    0% {
+        transform: scaleY(0.2);
+        transform-origin: bottom;
+    }
+
+    100% {
+        transform: scaleY(1);
+        transform-origin: bottom;
+    }
+}
+
+@keyframes drift {
+    0% {
+        transform: translate(0, 0) scale(1);
+    }
+
+    100% {
+        transform: translate(100px, 80px) scale(1.1);
+    }
+}
+
+/* 通用组件 */
+.gradient-text {
+    background: linear-gradient(135deg, var(--gradient-1), var(--gradient-2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.text-glow {
+    text-shadow: 0 0 40px rgba(0, 230, 118, 0.4);
+}
+
+.glass-panel {
+    background: var(--panel-bg);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--panel-border);
+    border-radius: 16px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+}
+
+/* 幻灯片控制 */
+#slides-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+.slide {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    padding: 60px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+    visibility: hidden;
+    z-index: 1;
+}
+
+.slide-active {
+    opacity: 1;
+    visibility: visible;
+    z-index: 10;
+}
+
+.animate-element {
+    opacity: 0;
+    transform: translateY(30px);
+    transition: all 0.7s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.slide-active .animate-element {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.delay-1 {
+    transition-delay: 0.1s;
+}
+
+.delay-2 {
+    transition-delay: 0.3s;
+}
+
+.delay-3 {
+    transition-delay: 0.5s;
+}
+
+.delay-4 {
+    transition-delay: 0.7s;
+}
+
+.delay-5 {
+    transition-delay: 0.9s;
+}
+
+/* 居中排版结构 */
+.content-center {
+    text-align: center;
+    max-width: 1400px;
+    width: 100%;
+}
+
+/* 第一页排版 */
+.top-subtitle {
+    font-size: 3.5rem;
+    font-weight: 700;
+    letter-spacing: 12px;
+    margin-bottom: 20px;
+}
+
+.giant-txt {
+    font-size: 8rem;
+    font-weight: 900;
+    letter-spacing: -2px;
+    color: var(--text-light);
+}
+
+.bottom-desc {
+    font-size: 2.2rem;
+    font-weight: 400;
+    letter-spacing: 15px;
+    color: var(--text-main);
+    margin-top: 30px;
+    opacity: 0.8;
+}
+
+/* 左右分栏结构 (第二页科普页使用) */
+.content-split {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    max-width: 1600px;
+    gap: 60px;
+}
+
+.text-side {
+    flex: 1;
+}
+
+.image-side {
+    flex: 1.2;
+}
+
+.sub-headline {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--text-light);
+}
+
+.side-title {
+    font-size: 4rem;
+    font-weight: 900;
+    color: var(--text-light);
+    text-shadow: 0 5px 20px rgba(0, 0, 0, 0.5);
+}
+
+/* 科普列表样式 */
+.tech-list {
+    list-style: none;
+    margin-top: 30px;
+}
+
+.tech-list li {
+    margin-bottom: 40px;
+    padding-left: 30px;
+    border-left: 4px solid rgba(255, 255, 255, 0.1);
+}
+
+.tech-list li:first-child {
+    border-left-color: #ff6b6b;
+}
+
+.tech-list strong {
+    font-size: 1.8rem;
+    color: var(--text-light);
+    display: block;
+    margin-bottom: 10px;
+}
+
+.tech-list p {
+    font-size: 1.3rem;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.placeholder-box img {
+    width: 100%;
+    height: auto;
+    border-radius: 8px;
+    object-fit: cover;
+    display: block;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* 软件特性展示页 (Slide 3) */
+.full-width {
+    width: 100%;
+}
+
+.main-title {
+    font-size: 4.5rem;
+    font-weight: 900;
+    color: var(--text-light);
+    text-shadow: 0 10px 30px rgba(0, 230, 118, 0.2);
+}
+
+.app-display-area {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 50px;
+    margin-top: 40px;
+}
+
+.app-image-wrap {
+    padding: 15px;
+}
+
+.app-img {
+    width: 800px;
+    border-radius: 10px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), 0 0 20px rgba(0, 230, 118, 0.1);
+}
+
+.app-tags {
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
+}
+
+.tech-tag {
+    font-size: 1.8rem;
+    font-weight: bold;
+    color: var(--text-light);
+    background: rgba(0, 230, 118, 0.05);
+    border: 1px solid rgba(0, 230, 118, 0.3);
+    padding: 20px 30px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    white-space: nowrap;
+}
+
+.tech-tag .dot {
+    width: 12px;
+    height: 12px;
+    background: var(--accent-color);
+    border-radius: 50%;
+    box-shadow: 0 0 15px var(--accent-color);
+}
+
+
+/* 音频无缝对比控制台 (Slide 4) */
+.audio-console {
+    width: 100%;
+    max-width: 1300px;
+    margin: 30px auto 0;
+    padding: 40px;
+    background: rgba(4, 15, 9, 0.8);
+    border: 2px solid rgba(0, 230, 118, 0.4);
+}
+
+.console-header {
+    display: flex;
+    align-items: center;
+    gap: 40px;
+    margin-bottom: 40px;
+    background: rgba(0, 0, 0, 0.4);
+    padding: 20px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.play-btn {
+    background: var(--accent-color);
+    color: #000;
+    border: none;
+    padding: 15px 40px;
+    font-size: 1.8rem;
+    font-weight: 900;
+    border-radius: 8px;
+    /* 偏向极客的方形硬角 */
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.play-btn:hover {
+    background: #fff;
+}
+
+.play-btn.playing {
+    background: #ff5252;
+    color: #fff;
+}
+
+.time-display {
+    font-size: 2rem;
+    font-family: monospace;
+    color: var(--accent-color);
+    width: 180px;
+    text-shadow: 0 0 10px rgba(0, 230, 118, 0.5);
+}
+
+.progress-bar-container {
+    flex: 1;
+    height: 8px;
+    /* 更细长 */
+    background: rgba(255, 255, 255, 0.1);
+    cursor: pointer;
+    position: relative;
+}
+
+.progress-bar {
+    height: 100%;
+    width: 0%;
+    background: var(--accent-color);
+    box-shadow: 0 0 15px var(--accent-color);
+    pointer-events: none;
+    transition: width 0.1s linear;
+}
+
+.console-body {
+    display: flex;
+    gap: 60px;
+}
+
+.track-selector {
+    flex: 1;
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    padding-right: 60px;
+}
+
+.track-title {
+    font-size: 1.8rem;
+    color: rgba(255, 255, 255, 0.8);
+    margin-bottom: 25px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+.track-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+}
+
+.track-btn {
+    background: #000;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: var(--text-main);
+    padding: 18px 20px;
+    font-size: 1.3rem;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+    font-family: inherit;
+}
+
+.track-btn:hover {
+    border-color: var(--accent-color);
+    color: #fff;
+}
+
+.track-btn.active {
+    background: rgba(0, 230, 118, 0.15);
+    border-color: var(--accent-color);
+    color: var(--accent-color);
+    box-shadow: inset 0 0 15px rgba(0, 230, 118, 0.2);
+}
+
+.now-playing-info {
+    margin-top: 30px;
+    font-size: 1.2rem;
+    color: rgba(255, 255, 255, 0.5);
+    line-height: 1.6;
+    background: #000;
+    padding: 15px;
+    border-radius: 6px;
+    border-left: 3px solid var(--accent-color);
+}
+
+.now-playing-info span {
+    font-size: 1.3rem;
+    color: #fff;
+}
+
+.ab-switcher {
+    flex: 1.2;
+}
+
+.switcher-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 25px;
+}
+
+.model-btn {
+    background: #000;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    padding: 30px;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+}
+
+.model-name {
+    font-size: 2.2rem;
+    font-weight: 900;
+    color: var(--text-light);
+    margin-bottom: 10px;
+    font-family: monospace;
+}
+
+.model-desc {
+    font-size: 1.3rem;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.playing-indicator {
+    position: absolute;
+    right: 30px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    gap: 6px;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.playing-indicator .wave {
+    width: 8px;
+    height: 30px;
+    background: #fff;
+    border-radius: 2px;
+    animation: sound 0.8s ease-in-out infinite alternate;
+}
+
+.playing-indicator .wave:nth-child(2) {
+    animation-delay: 0.2s;
+    height: 40px;
+}
+
+.playing-indicator .wave:nth-child(3) {
+    animation-delay: 0.4s;
+    height: 20px;
+}
+
+.switch-a:hover {
+    border-color: #ff5252;
+}
+
+.switch-a.active {
+    background: rgba(255, 82, 82, 0.1);
+    border-color: #ff5252;
+    box-shadow: 0 0 40px rgba(255, 82, 82, 0.15);
+}
+
+.switch-a.active .model-name {
+    color: #ff5252;
+    text-shadow: 0 0 10px rgba(255, 82, 82, 0.5);
+}
+
+.switch-a.active .playing-indicator {
+    opacity: 1;
+}
+
+.switch-a.active .playing-indicator .wave {
+    background: #ff5252;
+}
+
+.switch-b:hover {
+    border-color: var(--accent-color);
+}
+
+.switch-b.active {
+    background: rgba(0, 230, 118, 0.1);
+    border-color: var(--accent-color);
+    box-shadow: 0 0 40px rgba(0, 230, 118, 0.15);
+}
+
+.switch-b.active .model-name {
+    color: var(--accent-color);
+    text-shadow: 0 0 10px rgba(0, 230, 118, 0.5);
+}
+
+.switch-b.active .playing-indicator {
+    opacity: 1;
+}
+
+.switch-b.active .playing-indicator .wave {
+    background: var(--accent-color);
+}
+
+
+/* 获取指引页 (Slide 5) */
+.step-guide {
+    margin-top: 60px;
+    padding: 60px 80px;
+    background: rgba(0, 0, 0, 0.4);
+    text-align: left;
+    display: inline-block;
+    border-left: 5px solid var(--accent-color);
+}
+
+.cool-list {
+    list-style: none;
+}
+
+.cool-list li {
+    font-size: 2rem;
+    color: rgba(255, 255, 255, 0.9);
+    margin-bottom: 25px;
+    display: flex;
+    align-items: center;
+}
+
+.cool-list li span {
+    font-family: monospace;
+    color: var(--accent-color);
+    font-size: 2.5rem;
+    font-weight: 900;
+    margin-right: 20px;
+    opacity: 0.8;
+}
+
+.cool-list li strong {
+    color: #fff;
+    font-weight: 700;
+}
+
+/* 底部极简提示文字 */
+.hint-overlay {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.2);
+    font-family: monospace;
+    font-size: 1rem;
+    z-index: 100;
+}

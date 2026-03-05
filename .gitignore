@@ -6,3 +6,6 @@ requirements_processed.txt
 ffmpeg_path.txt
 *.tar.gz
 *.ckpt
+*.wav
+*.flac
+promo_page/0
