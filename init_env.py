@@ -6,8 +6,8 @@ logic that should NOT live in generic bootstrap.ps1:
   1. PyTorch (CUDA vs CPU auto-detection)
   2. audio-separator (metadata says numpy>=2, but works fine with numpy 1.x)
   3. numpy version pin (onnxruntime 1.17.x needs numpy 1.x ABI)
-  4. FFmpeg provisioning for this project only
-    5. Model files download (HuggingFace CN mirror)
+  4. FFmpeg runtime via imageio-ffmpeg from domestic PyPI mirror
+  5. Model files download (HuggingFace CN mirror)
 
 Standard packages go in requirements.txt (handled by bootstrap.ps1).
 Called automatically by bootstrap.ps1 during deployment.
@@ -16,7 +16,6 @@ import os
 import sys
 import subprocess
 import shutil
-import zipfile
 import urllib.request
 import urllib.error
 import ssl
@@ -31,6 +30,9 @@ CUDA_VERSION = "cu118"
 # Audio separator version
 AUDIO_SEPARATOR_VERSION = "0.41.1"
 
+# FFmpeg runtime version (domestic PyPI mirror)
+IMAGEIO_FFMPEG_VERSION = "0.6.0"
+
 # NumPy constraint (onnxruntime 1.17.x was compiled against numpy 1.x ABI)
 NUMPY_CONSTRAINT = "numpy>=1.21.6,<2.0"
 
@@ -39,15 +41,6 @@ MIRROR_URL = "https://mirrors.aliyun.com/pypi/simple/"
 TORCH_CUDA_INDEX = f"https://download.pytorch.org/whl/{CUDA_VERSION}"
 TORCH_ALIYUN_INDEX = f"https://mirrors.aliyun.com/pytorch-wheels/{CUDA_VERSION}/"
 TORCH_CPU_INDEX = "https://download.pytorch.org/whl/cpu"
-
-# FFmpeg config (project-specific)
-FFMPEG_ARCHIVE_NAME = "ffmpeg-master-latest-win64-gpl-shared.zip"
-FFMPEG_GITHUB_URL = f"https://github.com/BtbN/FFmpeg-Builds/releases/latest/download/{FFMPEG_ARCHIVE_NAME}"
-FFMPEG_DOWNLOAD_URLS = [
-    f"https://ghproxy.net/{FFMPEG_GITHUB_URL}",
-    f"https://gh-proxy.com/{FFMPEG_GITHUB_URL}",
-    FFMPEG_GITHUB_URL,
-]
 
 # Model files (project-specific)
 # Keep local filenames consistent with original upstream names.
@@ -60,10 +53,8 @@ MODEL_FILES = {
 
 ENV_DIR = "python_env"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-FFMPEG_ROOT = os.path.join(BASE_DIR, "ffmpeg")
-FFMPEG_BIN = os.path.join(FFMPEG_ROOT, "bin")
-FFMPEG_EXE = os.path.join(FFMPEG_BIN, "ffmpeg.exe")
-FFMPEG_PATH_FILE = os.path.join(BASE_DIR, "ffmpeg_path.txt")
+FFMPEG_RUNTIME_DIR = os.path.join(BASE_DIR, "ffmpeg_runtime")
+FFMPEG_RUNTIME_EXE = os.path.join(FFMPEG_RUNTIME_DIR, "ffmpeg.exe")
 
 
 def _to_hf_resolve_url(url: str) -> str:
@@ -136,100 +127,48 @@ def ensure_model_files():
             )
 
 
-def write_ffmpeg_path(path: str):
-    # ASCII to avoid BOM when BAT uses set /p
-    with open(FFMPEG_PATH_FILE, "w", encoding="ascii", errors="ignore") as f:
-        f.write(path)
-
-
-def check_system_ffmpeg():
-    """Return ffmpeg bin dir if system ffmpeg exists, else None."""
-    ffmpeg_path = shutil.which("ffmpeg")
-    if ffmpeg_path and os.path.exists(ffmpeg_path):
-        return os.path.dirname(ffmpeg_path)
-    return None
-
-
 def ensure_ffmpeg():
-    """Project-specific FFmpeg provisioning."""
-    # 1) Prefer system ffmpeg
-    system_bin = check_system_ffmpeg()
-    if system_bin:
-        write_ffmpeg_path(system_bin)
-        print(f"[+] Using system ffmpeg: {os.path.join(system_bin, 'ffmpeg.exe')}")
-        return
-
-    # 2) Use existing local ffmpeg
-    if os.path.exists(FFMPEG_EXE):
-        write_ffmpeg_path(FFMPEG_BIN)
-        print(f"[+] Using local ffmpeg: {FFMPEG_EXE}")
-        return
-
-    # 3) Download local ffmpeg
-    print("[*] System ffmpeg not found, downloading local portable ffmpeg...")
-    archive_local = os.path.join(BASE_DIR, FFMPEG_ARCHIVE_NAME)
-    extract_temp = os.path.join(BASE_DIR, "_ffmpeg_extract_temp")
-
-    downloaded = False
-    for url in FFMPEG_DOWNLOAD_URLS:
-        print(f"    Source: {url}")
-        try:
-            _download_file(url, archive_local)
-            if os.path.getsize(archive_local) < 10 * 1024 * 1024:
-                raise RuntimeError("Downloaded archive too small, likely an error page")
-            downloaded = True
-            break
-        except Exception as e:
-            print(f"    Failed: {e}")
-            if os.path.exists(archive_local):
-                os.remove(archive_local)
-
-    if not downloaded:
-        raise RuntimeError(
-            "FFmpeg download failed from all sources. "
-            f"Please install ffmpeg manually or download: {FFMPEG_GITHUB_URL}"
-        )
-
+    """Validate FFmpeg runtime provided by imageio-ffmpeg."""
     try:
-        if os.path.exists(extract_temp):
-            shutil.rmtree(extract_temp, ignore_errors=True)
-        os.makedirs(extract_temp, exist_ok=True)
+        import imageio_ffmpeg
+    except Exception as e:
+        raise RuntimeError(
+            f"imageio-ffmpeg unavailable: {e}. "
+            f"Please install imageio-ffmpeg=={IMAGEIO_FFMPEG_VERSION} from domestic PyPI mirror."
+        ) from e
 
-        with zipfile.ZipFile(archive_local, "r") as zf:
-            zf.extractall(extract_temp)
+    ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
+    if not ffmpeg_exe or not os.path.exists(ffmpeg_exe):
+        raise RuntimeError("imageio-ffmpeg did not provide a usable ffmpeg executable")
 
-        found_exe = None
-        for root, _, files in os.walk(extract_temp):
-            if "ffmpeg.exe" in files:
-                found_exe = os.path.join(root, "ffmpeg.exe")
-                break
+    os.makedirs(FFMPEG_RUNTIME_DIR, exist_ok=True)
 
-        if not found_exe:
-            raise RuntimeError("ffmpeg.exe not found after extraction")
+    should_copy = True
+    if os.path.exists(FFMPEG_RUNTIME_EXE):
+        try:
+            should_copy = (
+                os.path.getsize(FFMPEG_RUNTIME_EXE) != os.path.getsize(ffmpeg_exe)
+                or os.path.getmtime(FFMPEG_RUNTIME_EXE) < os.path.getmtime(ffmpeg_exe)
+            )
+        except OSError:
+            should_copy = True
 
-        found_bin = os.path.dirname(found_exe)
-        found_root = os.path.dirname(found_bin)
+    if should_copy:
+        shutil.copy2(ffmpeg_exe, FFMPEG_RUNTIME_EXE)
 
-        if os.path.exists(FFMPEG_ROOT):
-            shutil.rmtree(FFMPEG_ROOT, ignore_errors=True)
-        shutil.copytree(found_root, FFMPEG_ROOT)
-
-        if not os.path.exists(FFMPEG_EXE):
-            raise RuntimeError(f"Local ffmpeg install failed: {FFMPEG_EXE} not found")
-
-        write_ffmpeg_path(FFMPEG_BIN)
-        print(f"[+] Local ffmpeg installed: {FFMPEG_EXE}")
-    finally:
-        if os.path.exists(extract_temp):
-            shutil.rmtree(extract_temp, ignore_errors=True)
-        if os.path.exists(archive_local):
-            os.remove(archive_local)
+    print(f"[+] Using imageio-ffmpeg runtime: {FFMPEG_RUNTIME_EXE}")
+    return FFMPEG_RUNTIME_EXE
 
 
 def check_nvidia_gpu():
     """Detect NVIDIA GPU presence"""
     try:
-        cmd = 'powershell -Command "Get-CimInstance win32_VideoController | Select-Object -ExpandProperty Name"'
+        system_root = os.environ.get("SystemRoot", r"C:\Windows")
+        ps_exe = os.path.join(system_root, "System32", "WindowsPowerShell", "v1.0", "powershell.exe")
+        if not os.path.exists(ps_exe):
+            ps_exe = shutil.which("pwsh") or shutil.which("powershell") or "powershell"
+
+        cmd = f'"{ps_exe}" -Command "Get-CimInstance win32_VideoController | Select-Object -ExpandProperty Name"'
         output = subprocess.check_output(cmd, shell=True).decode('utf-8', errors='ignore')
         if "NVIDIA" in output.upper():
             print("[+] NVIDIA GPU detected. Installing CUDA-enabled PyTorch.")
@@ -256,10 +195,7 @@ def install_all(py_exe, has_gpu):
     # Step 1: Ensure model files for this project
     ensure_model_files()
 
-    # Step 2: Ensure FFmpeg for this project
-    ensure_ffmpeg()
-
-    # Step 3: Install PyTorch with CUDA/CPU suffix
+    # Step 2: Install PyTorch with CUDA/CPU suffix
     suffix = f"+{CUDA_VERSION}" if has_gpu else "+cpu"
     torch_pkgs = [
         f"torch=={TORCH_VERSION}{suffix}",
@@ -275,9 +211,13 @@ def install_all(py_exe, has_gpu):
         torch_args += ["--extra-index-url", TORCH_CPU_INDEX]
         run_pip(py_exe, torch_args, f"Installing PyTorch {TORCH_VERSION}+cpu...")
 
-    # Step 4: Install audio-separator (pulls in numpy 2.x via its dependency)
+    # Step 3: Install audio-separator (pulls in numpy 2.x via its dependency)
     run_pip(py_exe, ["-i", MIRROR_URL, f"audio-separator=={AUDIO_SEPARATOR_VERSION}"],
             f"Installing audio-separator {AUDIO_SEPARATOR_VERSION}...")
+
+    # Step 4: Install FFmpeg runtime from domestic PyPI mirror
+    run_pip(py_exe, ["-i", MIRROR_URL, f"imageio-ffmpeg=={IMAGEIO_FFMPEG_VERSION}"],
+            f"Installing imageio-ffmpeg {IMAGEIO_FFMPEG_VERSION}...")
 
     # Step 5: Force-downgrade numpy to 1.x (onnxruntime 1.17.x ABI requirement)
     # audio-separator's metadata says numpy>=2 but it works fine with numpy 1.x (verified).
@@ -285,13 +225,16 @@ def install_all(py_exe, has_gpu):
     run_pip(py_exe, ["-i", MIRROR_URL, NUMPY_CONSTRAINT],
             "Pinning numpy<2 (required for onnxruntime 1.17.x compatibility)...")
 
+    # Step 6: Validate FFmpeg runtime after package installation
+    ensure_ffmpeg()
+
     print("[+] All project-specific dependencies installed.")
 
 
 if __name__ == "__main__":
     print("=" * 50)
     print("  Project-specific dependency installer")
-    print("  (FFmpeg + PyTorch CUDA/CPU + audio-separator + numpy pin)")
+    print("  (PyTorch CUDA/CPU + audio-separator + imageio-ffmpeg + numpy pin)")
     print("=" * 50)
 
     # Isolate environment

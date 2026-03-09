@@ -3,6 +3,7 @@ import json
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_YAML_NAME = "BS-Rofo-SW-Fixed-roformer.yaml"
+DOWNLOAD_CHECKS_NAME = "download_checks.json"
 
 
 def ensure_local_model_files():
@@ -23,6 +24,52 @@ def ensure_local_model_yaml():
     yaml_path = os.path.join(BASE_DIR, MODEL_YAML_NAME)
     if not os.path.exists(yaml_path):
         raise RuntimeError(f"缺少本地 YAML 配置文件: {MODEL_YAML_NAME}")
+
+
+def ensure_local_download_checks():
+    """确保仓库内已提供本地模型索引文件。"""
+    download_checks_path = os.path.join(BASE_DIR, DOWNLOAD_CHECKS_NAME)
+    if not os.path.exists(download_checks_path) or os.path.getsize(download_checks_path) <= 0:
+        raise RuntimeError(f"缺少本地模型索引文件: {DOWNLOAD_CHECKS_NAME}")
+
+
+def prepend_env_path(path: str):
+    """将指定路径前置到 PATH，避免依赖系统环境。"""
+    normalized_target = os.path.normcase(os.path.abspath(path))
+    current_path = os.environ.get("PATH", "")
+    current_entries = [entry for entry in current_path.split(os.pathsep) if entry]
+    normalized_entries = {os.path.normcase(os.path.abspath(entry)) for entry in current_entries}
+
+    if normalized_target in normalized_entries:
+        return
+
+    os.environ["PATH"] = path if not current_path else path + os.pathsep + current_path
+
+
+def resolve_runtime_ffmpeg_bin():
+    """解析项目运行时可用的 ffmpeg 可执行文件目录。"""
+    try:
+        from init_env import ensure_ffmpeg
+    except Exception as e:
+        raise RuntimeError(f"缺少 FFmpeg 运行时初始化逻辑：{e}") from e
+
+    ffmpeg_exe = ensure_ffmpeg()
+    if not ffmpeg_exe or not os.path.exists(ffmpeg_exe):
+        raise RuntimeError("未能初始化可用的 ffmpeg 运行时")
+
+    return os.path.dirname(ffmpeg_exe)
+
+
+def ensure_runtime_ffmpeg():
+    """确保运行时可通过 imageio-ffmpeg 获取 FFmpeg。"""
+    prepend_env_path(resolve_runtime_ffmpeg_bin())
+
+
+def configure_runtime_environment():
+    """配置离线运行环境。"""
+    ensure_local_download_checks()
+    ensure_runtime_ffmpeg()
+    os.environ["AUDIO_SEPARATOR_MODEL_DIR"] = BASE_DIR
 
 def auto_register_model():
     """
@@ -75,16 +122,19 @@ def auto_register_model():
         pass  # 静默失败，不影响主程序启动
 
 if __name__ == "__main__":
-    # 1. 启动前确保模型文件存在（ckpt 缺失时自动下载）
+    # 1. 配置离线运行环境（本地模型索引 + imageio-ffmpeg 运行时）
+    configure_runtime_environment()
+
+    # 2. 启动前确保模型文件存在（ckpt 缺失时自动下载）
     ensure_local_model_files()
 
-    # 2. 确保仓库内模型 YAML 存在（不下载、不改名）
+    # 3. 确保仓库内模型 YAML 存在（不下载、不改名）
     ensure_local_model_yaml()
 
-    # 3. 自动注册自定义模型到 audio-separator（首次运行时写入，之后跳过）
+    # 4. 自动注册自定义模型到 audio-separator（首次运行时写入，之后跳过）
     auto_register_model()
 
-    # 4. 启动 GUI
+    # 5. 启动 GUI
     try:
         from tkinterdnd2 import TkinterDnD
         from gui import AudioSplitterGUI

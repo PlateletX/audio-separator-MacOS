@@ -8,6 +8,22 @@ import ctypes
 import sys
 import locale
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+def resolve_runtime_ffmpeg_bin():
+    """解析项目运行时可用的 ffmpeg 可执行文件目录。"""
+    try:
+        from init_env import ensure_ffmpeg
+    except Exception as e:
+        raise RuntimeError(f"缺少 FFmpeg 运行时初始化逻辑：{e}") from e
+
+    ffmpeg_exe = ensure_ffmpeg()
+    if not ffmpeg_exe or not os.path.exists(ffmpeg_exe):
+        raise RuntimeError("未能初始化可用的 ffmpeg 运行时")
+
+    return os.path.dirname(ffmpeg_exe)
+
 try:
     import torch
 except ImportError:
@@ -280,7 +296,7 @@ class AudioSplitterGUI:
 
     def run_separation(self):
         try:
-            model_dir = os.path.dirname(os.path.abspath(__file__))
+            model_dir = BASE_DIR
             
             input_file = self.input_path.get()
             base_name = os.path.splitext(os.path.basename(input_file))[0]
@@ -301,7 +317,13 @@ class AudioSplitterGUI:
                 "--mdxc_batch_size", self.batch_size.get()
             ]
             
-            run_kwargs = {"capture_output": True}
+            env = os.environ.copy()
+            ffmpeg_bin = resolve_runtime_ffmpeg_bin()
+            current_path = env.get("PATH", "")
+            env["PATH"] = ffmpeg_bin if not current_path else ffmpeg_bin + os.pathsep + current_path
+            env["AUDIO_SEPARATOR_MODEL_DIR"] = model_dir
+
+            run_kwargs = {"capture_output": True, "env": env}
 
             # Windows 下隐藏 audio-separator 子进程控制台窗口
             if os.name == "nt":
