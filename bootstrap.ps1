@@ -145,7 +145,7 @@ if (-not (Test-Path $PythonExe)) {
 
     # Cleanup temp files
     if (Test-Path $TempExtractDir) { Remove-Item $TempExtractDir -Recurse -Force }
-    if (Test-Path $ArchiveLocal)   { Remove-Item $ArchiveLocal -Force }
+    # 保留 Python 安装包压缩文件，便于后续重复部署或离线复用
 
     Write-Host "      Python extracted to python_env/" -ForegroundColor Green
 }

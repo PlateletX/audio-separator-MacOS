@@ -1,6 +1,6 @@
 1.部署阶段建议关闭代理。项目默认使用国内镜像安装 Python 依赖，开启代理反而可能导致网络异常。
 2.项目现在通过国内 PyPI 镜像安装 `imageio-ffmpeg`作为 FFmpeg 运行时。
-3.项目根目录的 [`download_checks.json`](download_checks.json) 已作为本地模型索引使用。请不要删除它。
+3.项目根目录的`download_checks.json`已作为本地模型索引使用。请不要删除它。
 4.如果模型文件下载到一半很慢，可尝试关闭窗口重新启动；若需重新下载模型，请先删除现有的(BS-Rofo-SW-Fixed.ckpt)。
 5.无需理会黄色 WARNING 字样，大多数情况下不影响使用。
 6.解压时，360 等安全软件可能会拦截 `tar.exe`的解压操作，需要手动放行；`pythonw.exe`启动图形界面时也可能被拦截，放行即可。
@@ -10,3 +10,4 @@
 https://www.123865.com/s/fuDMjv-gp05d
 `cpython-3.11.9+20240415-x86_64-pc-windows-msvc-shared-install_only.tar.gz`
 `BS-Rofo-SW-Fixed.ckpt`
+`mel_band_roformer_karaoke_aufr33_viperx_sdr_10.1956_config.yaml`

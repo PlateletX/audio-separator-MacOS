@@ -344,7 +344,7 @@
             }
 
             document.addEventListener('click', (e) => {
-                if (e.target.closest('#audio-console-wrap')) return;
+                if (e.target.closest('.audio-console, button, .progress-bar-container')) return;
                 goToSlide(currentSlide + 1);
             });
 
