@@ -186,7 +186,63 @@
             </div>
         </div>
 
-        <!-- Slide 5: 全局联动工业流 (YourMT3+) -->
+        <!-- Slide 5: 和声 / 干声对比 -->
+        <div class="slide" id="harmony-audio-slide">
+            <div class="content-center full-width">
+                <h1 class="main-title delay-1 animate-element">和声 / 干声对比</h1>
+                <p class="side-desc delay-1 animate-element" style="margin-bottom: 30px; text-align: center;">
+                    同一段人声二次分离结果即时切换，请佩戴耳机聆听</p>
+                <div class="audio-console glass-panel delay-2 animate-element" id="audio-console-wrap-harmony">
+                    <div class="console-header">
+                        <button id="play-pause-btn-harmony" class="play-btn">▶ 播放音频</button>
+                        <div class="time-display"><span id="current-time-harmony">0:00</span> / <span
+                                id="total-time-harmony">0:00</span></div>
+                        <div class="progress-bar-container" id="progress-container-harmony">
+                            <div class="progress-bar" id="progress-bar-harmony"></div>
+                        </div>
+                    </div>
+
+                    <div class="console-body">
+                        <div class="track-selector">
+                            <h3 class="track-title">🎧 二次分离试听</h3>
+                            <div class="track-buttons">
+                                <button class="track-btn active" type="button">和声 / 干声双轨对比</button>
+                            </div>
+                            <div class="now-playing-info">
+                                当前样例：<br><span id="track-name-display-harmony" class="gradient-text"
+                                    style="font-family: monospace;">トゲナシトゲアリ - 雑踏、僕らの街 (OP)<br>和声 / 干声</span>
+                            </div>
+                        </div>
+
+                        <div class="ab-switcher">
+                            <h3 class="track-title">🎚️ 分离结果即时切换</h3>
+                            <div class="switcher-buttons">
+                                <button id="btn-harmony-a" class="model-btn switch-a active">
+                                    <span class="model-name">和声</span>
+                                    <span class="model-desc">Backing Vocals / Harmony</span>
+                                    <div class="playing-indicator">
+                                        <div class="wave"></div>
+                                        <div class="wave"></div>
+                                        <div class="wave"></div>
+                                    </div>
+                                </button>
+                                <button id="btn-harmony-b" class="model-btn switch-b">
+                                    <span class="model-name">干声</span>
+                                    <span class="model-desc">Lead Vocal / Dry Vocal</span>
+                                    <div class="playing-indicator">
+                                        <div class="wave"></div>
+                                        <div class="wave"></div>
+                                        <div class="wave"></div>
+                                    </div>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 6: 全局联动工业流 (YourMT3+) -->
         <div class="slide">
             <div class="content-split-tech">
                 <div class="tech-header delay-1 animate-element">
@@ -240,7 +296,7 @@
             </div>
         </div>
 
-        <!-- Slide 6: 极简化尾页，拒绝营销套路 -->
+        <!-- Slide 7: 极简化尾页，拒绝营销套路 -->
         <div class="slide">
             <div class="content-center">
                 <h1 class="main-title delay-1 animate-element"
@@ -300,114 +356,6 @@
                 }
             });
 
-            // --------- 音频对轨与无缝切换逻辑 ---------
-            const tracks = {
-                vocals: {
-                    a: '../样品试听/1_トゲナシトゲアリ - 雑踏、僕らの街 (OP)_(Vocals).wav',
-                    b: '../样品试听/トゲナシトゲアリ - 雑踏、僕らの街 (OP)_(vocals)_BS-Rofo-SW-Fixed.flac'
-                },
-                bass: {
-                    a: '../样品试听/1_トゲナシトゲアリ - 雑踏、僕らの街 (OP)_(Bass).wav',
-                    b: '../样品试听/トゲナシトゲアリ - 雑踏、僕らの街 (OP)_(bass)_BS-Rofo-SW-Fixed.flac'
-                },
-                drums: {
-                    a: '../样品试听/1_トゲナシトゲアリ - 雑踏、僕らの街 (OP)_(Drums).wav',
-                    b: '../样品试听/トゲナシトゲアリ - 雑踏、僕らの街 (OP)_(drums)_BS-Rofo-SW-Fixed.flac'
-                },
-                guitar: {
-                    a: '../样品试听/1_トゲナシトゲアリ - 雑踏、僕らの街 (OP)_(Guitar).wav',
-                    b: '../样品试听/トゲナシトゲアリ - 雑踏、僕らの街 (OP)_(guitar)_BS-Rofo-SW-Fixed.flac'
-                },
-                piano: {
-                    a: '../样品试听/1_トゲナシトゲアリ - 雑踏、僕らの街 (OP)_(Piano).wav',
-                    b: '../样品试听/トゲナシトゲアリ - 雑踏、僕らの街 (OP)_(piano)_BS-Rofo-SW-Fixed.flac'
-                },
-                other: {
-                    a: '../样品试听/1_トゲナシトゲアリ - 雑踏、僕らの街 (OP)_(Other).wav',
-                    b: '../样品试听/トゲナシトゲアリ - 雑踏、僕らの街 (OP)_(other)_BS-Rofo-SW-Fixed.flac'
-                }
-            };
-
-            const audioA = new Audio();
-            const audioB = new Audio();
-            let activeModel = 'a';
-            let currentTrackKey = 'vocals';
-
-            function initTrackSource() {
-                const playing = !audioA.paused;
-                const time = audioA.currentTime;
-
-                audioA.src = tracks[currentTrackKey].a;
-                audioB.src = tracks[currentTrackKey].b;
-                updateVolume();
-
-                audioA.load();
-                audioB.load();
-
-                audioA.currentTime = time;
-                audioB.currentTime = time;
-
-                if (playing) {
-                    audioA.play().catch(e => console.log(e));
-                    audioB.play().catch(e => console.log(e));
-                }
-            }
-
-            function updateVolume() {
-                if (activeModel === 'a') {
-                    audioA.volume = 1; audioB.volume = 0;
-                } else {
-                    audioA.volume = 0; audioB.volume = 1;
-                }
-            }
-
-            initTrackSource();
-
-            const playBtn = document.getElementById('play-pause-btn');
-            playBtn.addEventListener('click', () => {
-                if (audioA.paused) {
-                    audioA.play(); audioB.play();
-                    playBtn.innerHTML = '⏸ 暂停';
-                    playBtn.classList.add('playing');
-                } else {
-                    audioA.pause(); audioB.pause();
-                    playBtn.innerHTML = '▶ 播放';
-                    playBtn.classList.remove('playing');
-                }
-            });
-
-            document.querySelectorAll('.track-btn').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    document.querySelectorAll('.track-btn').forEach(b => b.classList.remove('active'));
-                    e.target.classList.add('active');
-                    currentTrackKey = e.target.getAttribute('data-track');
-                    initTrackSource();
-                });
-            });
-
-            const btnA = document.getElementById('btn-model-a');
-            const btnB = document.getElementById('btn-model-b');
-
-            btnA.addEventListener('click', () => {
-                activeModel = 'a';
-                btnB.classList.remove('active');
-                btnA.classList.add('active');
-                document.body.className = 'theme-a';
-                updateVolume();
-            });
-            btnB.addEventListener('click', () => {
-                activeModel = 'b';
-                btnA.classList.remove('active');
-                btnB.classList.add('active');
-                document.body.className = 'theme-b';
-                updateVolume();
-            });
-
-            const progressContainer = document.getElementById('progress-container');
-            const progressBar = document.getElementById('progress-bar');
-            const currTimeEl = document.getElementById('current-time');
-            const totalTimeEl = document.getElementById('total-time');
-
             function formatTime(sec) {
                 if (!sec || isNaN(sec)) return "0:00";
                 let m = Math.floor(sec / 60) || 0;
@@ -415,30 +363,205 @@
                 return m + ":" + (s < 10 ? '0' : '') + s;
             }
 
-            audioA.addEventListener('timeupdate', () => {
-                if (audioA.duration) {
-                    const percent = (audioA.currentTime / audioA.duration) * 100;
-                    progressBar.style.width = percent + '%';
-                    currTimeEl.innerText = formatTime(audioA.currentTime);
+            function setupAudioConsole(options) {
+                const {
+                    playBtnId,
+                    currentTimeId,
+                    totalTimeId,
+                    progressContainerId,
+                    progressBarId,
+                    trackNameId,
+                    modelAButtonId,
+                    modelBButtonId,
+                    tracks,
+                    defaultTrackKey,
+                    trackButtonSelector,
+                    themeA = 'theme-a',
+                    themeB = 'theme-b'
+                } = options;
+
+                const audioA = new Audio();
+                const audioB = new Audio();
+                let activeModel = 'a';
+                let currentTrackKey = defaultTrackKey;
+
+                const playBtn = document.getElementById(playBtnId);
+                const progressContainer = document.getElementById(progressContainerId);
+                const progressBar = document.getElementById(progressBarId);
+                const currTimeEl = document.getElementById(currentTimeId);
+                const totalTimeEl = document.getElementById(totalTimeId);
+                const trackNameDisplay = document.getElementById(trackNameId);
+                const btnA = document.getElementById(modelAButtonId);
+                const btnB = document.getElementById(modelBButtonId);
+
+                function updateVolume() {
+                    if (activeModel === 'a') {
+                        audioA.volume = 1;
+                        audioB.volume = 0;
+                    } else {
+                        audioA.volume = 0;
+                        audioB.volume = 1;
+                    }
+                }
+
+                function initTrackSource() {
+                    const playing = !audioA.paused;
+                    const time = audioA.currentTime;
+                    const currentTrack = tracks[currentTrackKey];
+
+                    audioA.src = currentTrack.a;
+                    audioB.src = currentTrack.b;
+                    updateVolume();
+
+                    if (trackNameDisplay && currentTrack.label) {
+                        trackNameDisplay.innerHTML = currentTrack.label;
+                    }
+
+                    audioA.load();
+                    audioB.load();
+
+                    audioA.currentTime = time;
+                    audioB.currentTime = time;
+
+                    if (playing) {
+                        audioA.play().catch(e => console.log(e));
+                        audioB.play().catch(e => console.log(e));
+                    }
+                }
+
+                playBtn.addEventListener('click', () => {
+                    if (audioA.paused) {
+                        audioA.play().catch(e => console.log(e));
+                        audioB.play().catch(e => console.log(e));
+                        playBtn.innerHTML = '⏸ 暂停';
+                        playBtn.classList.add('playing');
+                    } else {
+                        audioA.pause();
+                        audioB.pause();
+                        playBtn.innerHTML = '▶ 播放';
+                        playBtn.classList.remove('playing');
+                    }
+                });
+
+                if (trackButtonSelector) {
+                    document.querySelectorAll(trackButtonSelector).forEach(btn => {
+                        btn.addEventListener('click', (e) => {
+                            document.querySelectorAll(trackButtonSelector).forEach(button => button.classList.remove('active'));
+                            e.currentTarget.classList.add('active');
+                            currentTrackKey = e.currentTarget.getAttribute('data-track');
+                            initTrackSource();
+                        });
+                    });
+                }
+
+                btnA.addEventListener('click', () => {
+                    activeModel = 'a';
+                    btnB.classList.remove('active');
+                    btnA.classList.add('active');
+                    document.body.className = themeA;
+                    updateVolume();
+                });
+
+                btnB.addEventListener('click', () => {
+                    activeModel = 'b';
+                    btnA.classList.remove('active');
+                    btnB.classList.add('active');
+                    document.body.className = themeB;
+                    updateVolume();
+                });
+
+                audioA.addEventListener('timeupdate', () => {
+                    if (audioA.duration) {
+                        const percent = (audioA.currentTime / audioA.duration) * 100;
+                        progressBar.style.width = percent + '%';
+                        currTimeEl.innerText = formatTime(audioA.currentTime);
+                    }
+                });
+
+                audioA.addEventListener('loadedmetadata', () => {
+                    totalTimeEl.innerText = formatTime(audioA.duration);
+                });
+
+                progressContainer.addEventListener('click', (e) => {
+                    const rect = progressContainer.getBoundingClientRect();
+                    const clickX = e.clientX - rect.left;
+                    const width = rect.width;
+                    const setTime = (clickX / width) * audioA.duration;
+                    audioA.currentTime = setTime;
+                    audioB.currentTime = setTime;
+                });
+
+                audioA.addEventListener('ended', () => {
+                    playBtn.innerHTML = '▶ 播放';
+                    playBtn.classList.remove('playing');
+                });
+
+                initTrackSource();
+            }
+
+            setupAudioConsole({
+                playBtnId: 'play-pause-btn',
+                currentTimeId: 'current-time',
+                totalTimeId: 'total-time',
+                progressContainerId: 'progress-container',
+                progressBarId: 'progress-bar',
+                trackNameId: 'track-name-display',
+                modelAButtonId: 'btn-model-a',
+                modelBButtonId: 'btn-model-b',
+                defaultTrackKey: 'vocals',
+                trackButtonSelector: '#audio-slide .track-btn[data-track]',
+                tracks: {
+                    vocals: {
+                        a: '../样品试听/1_トゲナシトゲアリ - 雑踏、僕らの街 (OP)_(Vocals).wav',
+                        b: '../样品试听/トゲナシトゲアリ - 雑踏、僕らの街 (OP)_(vocals)_BS-Rofo-SW-Fixed.flac',
+                        label: '1_トゲナシトゲアリ - 雑踏、僕らの街 (OP)'
+                    },
+                    bass: {
+                        a: '../样品试听/1_トゲナシトゲアリ - 雑踏、僕らの街 (OP)_(Bass).wav',
+                        b: '../样品试听/トゲナシトゲアリ - 雑踏、僕らの街 (OP)_(bass)_BS-Rofo-SW-Fixed.flac',
+                        label: '1_トゲナシトゲアリ - 雑踏、僕らの街 (OP)'
+                    },
+                    drums: {
+                        a: '../样品试听/1_トゲナシトゲアリ - 雑踏、僕らの街 (OP)_(Drums).wav',
+                        b: '../样品试听/トゲナシトゲアリ - 雑踏、僕らの街 (OP)_(drums)_BS-Rofo-SW-Fixed.flac',
+                        label: '1_トゲナシトゲアリ - 雑踏、僕らの街 (OP)'
+                    },
+                    guitar: {
+                        a: '../样品试听/1_トゲナシトゲアリ - 雑踏、僕らの街 (OP)_(Guitar).wav',
+                        b: '../样品试听/トゲナシトゲアリ - 雑踏、僕らの街 (OP)_(guitar)_BS-Rofo-SW-Fixed.flac',
+                        label: '1_トゲナシトゲアリ - 雑踏、僕らの街 (OP)'
+                    },
+                    piano: {
+                        a: '../样品试听/1_トゲナシトゲアリ - 雑踏、僕らの街 (OP)_(Piano).wav',
+                        b: '../样品试听/トゲナシトゲアリ - 雑踏、僕らの街 (OP)_(piano)_BS-Rofo-SW-Fixed.flac',
+                        label: '1_トゲナシトゲアリ - 雑踏、僕らの街 (OP)'
+                    },
+                    other: {
+                        a: '../样品试听/1_トゲナシトゲアリ - 雑踏、僕らの街 (OP)_(Other).wav',
+                        b: '../样品试听/トゲナシトゲアリ - 雑踏、僕らの街 (OP)_(other)_BS-Rofo-SW-Fixed.flac',
+                        label: '1_トゲナシトゲアリ - 雑踏、僕らの街 (OP)'
+                    }
                 }
             });
 
-            audioA.addEventListener('loadedmetadata', () => {
-                totalTimeEl.innerText = formatTime(audioA.duration);
-            });
-
-            progressContainer.addEventListener('click', (e) => {
-                const rect = progressContainer.getBoundingClientRect();
-                const clickX = e.clientX - rect.left;
-                const width = rect.width;
-                const setTime = (clickX / width) * audioA.duration;
-                audioA.currentTime = setTime;
-                audioB.currentTime = setTime;
-            });
-
-            audioA.addEventListener('ended', () => {
-                playBtn.innerHTML = '▶ 播放';
-                playBtn.classList.remove('playing');
+            setupAudioConsole({
+                playBtnId: 'play-pause-btn-harmony',
+                currentTimeId: 'current-time-harmony',
+                totalTimeId: 'total-time-harmony',
+                progressContainerId: 'progress-container-harmony',
+                progressBarId: 'progress-bar-harmony',
+                trackNameId: 'track-name-display-harmony',
+                modelAButtonId: 'btn-harmony-a',
+                modelBButtonId: 'btn-harmony-b',
+                defaultTrackKey: 'harmonyDry',
+                trackButtonSelector: null,
+                tracks: {
+                    harmonyDry: {
+                        a: '../样品试听/和声.flac',
+                        b: '../样品试听/干声.flac',
+                        label: 'トゲナシトゲアリ - 雑踏、僕らの街 (OP)<br>和声 / 干声'
+                    }
+                }
             });
         });
     </script>

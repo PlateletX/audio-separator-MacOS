@@ -394,15 +394,14 @@ class AudioSplitterGUI:
 
         def _ask_user():
             self.status_label.config(
-                text="> 已生成人声轨，等待确认是否继续分离干声和和声...",
+                text="> 分离完成。已获取人声轨，等待确认是否继续分离干声和和声...",
                 fg="#FFAA00"
             )
             result["confirmed"] = messagebox.askyesno(
-                "二次分离确认",
-                "已完成人声轨提取。\n\n"
-                f"检测到人声文件：\n{os.path.basename(vocal_path)}\n\n"
-                "是否继续使用 mel_band_roformer_karaoke_aufr33_viperx_sdr_10.1956 模型\n"
-                "将该 vocal 轨二次分离为干声 / 和声？"
+                "人声分离确认",
+                "已完成六轨分离。\n\n"
+                f"人声轨已提取：\n{os.path.basename(vocal_path)}\n\n"
+                "是否继续分离人声为干声/和声？"
             )
             decision_event.set()
 
