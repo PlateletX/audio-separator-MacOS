@@ -36,6 +36,9 @@ ACCENT_COLOR = "#00FFAA"
 ACCENT_HOVER = "#00CC88"      
 BORDER_COLOR = "#333333"    
 WARN_COLOR = "#FF5555"       
+PRIMARY_MODEL_NAME = "BS-Rofo-SW-Fixed.ckpt"
+HARMONY_MODEL_NAME = "mel_band_roformer_karaoke_aufr33_viperx_sdr_10.1956.ckpt"
+AUDIO_EXTENSIONS = {".wav", ".flac", ".mp3", ".m4a", ".ogg"}
 
 FONT_BASE = ("Microsoft YaHei UI", 11)
 FONT_BOLD = ("Microsoft YaHei UI", 11, "bold")
@@ -98,7 +101,8 @@ class AudioSplitterGUI:
         # 变量存储
         self.input_path = tk.StringVar()
         self.output_path = tk.StringVar()
-        self.model_name = "BS-Rofo-SW-Fixed.ckpt"
+        self.model_name = PRIMARY_MODEL_NAME
+        self.harmony_model_name = HARMONY_MODEL_NAME
         
         self.out_format = tk.StringVar(value="WAV")
         self.segment_size = tk.StringVar(value="512")
@@ -284,6 +288,128 @@ class AudioSplitterGUI:
         if folder:
             self.output_path.set(folder)
 
+    def set_status(self, text, color):
+        self.root.after(0, lambda: self.status_label.config(text=text, fg=color))
+
+    def run_separator_command(self, input_file, output_dir, model_name):
+        model_dir = BASE_DIR
+        cmd = [
+            "audio-separator",
+            input_file,
+            "--model_filename", model_name,
+            "--model_file_dir", model_dir,
+            "--output_dir", output_dir,
+            "--output_format", self.out_format.get(),
+            "--mdxc_segment_size", self.segment_size.get(),
+            "--mdxc_overlap", self.overlap.get(),
+            "--mdxc_batch_size", self.batch_size.get()
+        ]
+
+        env = os.environ.copy()
+        ffmpeg_bin = resolve_runtime_ffmpeg_bin()
+        current_path = env.get("PATH", "")
+        env["PATH"] = ffmpeg_bin if not current_path else ffmpeg_bin + os.pathsep + current_path
+        env["AUDIO_SEPARATOR_MODEL_DIR"] = model_dir
+
+        run_kwargs = {"capture_output": True, "env": env}
+
+        # Windows 下隐藏 audio-separator 子进程控制台窗口
+        if os.name == "nt":
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = 0
+            run_kwargs["startupinfo"] = startupinfo
+            run_kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+
+        process = subprocess.run(cmd, **run_kwargs)
+
+        preferred_enc = locale.getpreferredencoding(False) or "utf-8"
+
+        def _decode_best(raw: bytes) -> str:
+            if not raw:
+                return ""
+            text = raw.decode(preferred_enc, errors='replace')
+            if "���" in text:
+                for enc in ("utf-8", "gbk"):
+                    try:
+                        candidate = raw.decode(enc, errors='replace')
+                        if candidate.count("���") < text.count("���"):
+                            text = candidate
+                    except Exception:
+                        pass
+            return text
+
+        stdout = _decode_best(process.stdout)
+        stderr = _decode_best(process.stderr)
+        if process.returncode != 0:
+            raise RuntimeError(stderr or stdout or f"audio-separator 执行失败，退出码: {process.returncode}")
+
+    def find_vocal_track(self, target_dir, source_base_name):
+        candidates = []
+        preferred_ext = f".{self.out_format.get().lower()}"
+
+        for filename in os.listdir(target_dir):
+            file_path = os.path.join(target_dir, filename)
+            if not os.path.isfile(file_path):
+                continue
+            if os.path.splitext(filename)[1].lower() not in AUDIO_EXTENSIONS:
+                continue
+            candidates.append(file_path)
+
+        if not candidates:
+            raise RuntimeError("第一阶段分离已完成，但输出目录中未找到任何音频文件。")
+
+        source_name = source_base_name.lower()
+
+        def score(path):
+            name = os.path.basename(path).lower()
+            value = 0
+            if source_name in name:
+                value += 4
+            if "vocals" in name:
+                value += 5
+            elif "vocal" in name:
+                value += 4
+            elif "voice" in name:
+                value += 3
+            if name.endswith(preferred_ext):
+                value += 1
+            if any(token in name for token in ("instrumental", "inst", "karaoke", "no_vocals")):
+                value -= 6
+            return value, os.path.getmtime(path)
+
+        best_match = max(candidates, key=score)
+        if score(best_match)[0] <= 0:
+            available_files = "\n".join(os.path.basename(path) for path in candidates)
+            raise RuntimeError(
+                "第一阶段分离完成，但未能自动识别人声轨。\n"
+                f"当前输出文件:\n{available_files}"
+            )
+
+        return best_match
+
+    def confirm_secondary_separation(self, vocal_path):
+        result = {"confirmed": False}
+        decision_event = threading.Event()
+
+        def _ask_user():
+            self.status_label.config(
+                text="> 已生成人声轨，等待确认是否继续分离干声和和声...",
+                fg="#FFAA00"
+            )
+            result["confirmed"] = messagebox.askyesno(
+                "二次分离确认",
+                "已完成人声轨提取。\n\n"
+                f"检测到人声文件：\n{os.path.basename(vocal_path)}\n\n"
+                "是否继续使用 mel_band_roformer_karaoke_aufr33_viperx_sdr_10.1956 模型\n"
+                "将该 vocal 轨二次分离为干声 / 和声？"
+            )
+            decision_event.set()
+
+        self.root.after(0, _ask_user)
+        decision_event.wait()
+        return result["confirmed"]
+
     def start_thread(self):
         if not self.input_path.get() or not self.output_path.get():
             messagebox.showwarning("ERROR", "请输入源文件和输出路径")
@@ -296,77 +422,38 @@ class AudioSplitterGUI:
 
     def run_separation(self):
         try:
-            model_dir = BASE_DIR
-            
             input_file = self.input_path.get()
             base_name = os.path.splitext(os.path.basename(input_file))[0]
             target_dir = os.path.join(self.output_path.get(), base_name)
+            harmony_dir = os.path.join(target_dir, "02_干声和声")
             
-            if not os.path.exists(target_dir):
-                os.makedirs(target_dir)
+            os.makedirs(target_dir, exist_ok=True)
 
-            cmd = [
-                "audio-separator",
-                input_file,
-                "--model_filename", self.model_name,
-                "--model_file_dir", model_dir,
-                "--output_dir", target_dir,
-                "--output_format", self.out_format.get(),
-                "--mdxc_segment_size", self.segment_size.get(),
-                "--mdxc_overlap", self.overlap.get(),
-                "--mdxc_batch_size", self.batch_size.get()
-            ]
-            
-            env = os.environ.copy()
-            ffmpeg_bin = resolve_runtime_ffmpeg_bin()
-            current_path = env.get("PATH", "")
-            env["PATH"] = ffmpeg_bin if not current_path else ffmpeg_bin + os.pathsep + current_path
-            env["AUDIO_SEPARATOR_MODEL_DIR"] = model_dir
+            self.set_status("> 第一阶段：正在分离人声与伴奏，请耐心等待...", "#FFAA00")
+            self.run_separator_command(input_file, target_dir, self.model_name)
 
-            run_kwargs = {"capture_output": True, "env": env}
+            vocal_path = self.find_vocal_track(target_dir, base_name)
+            did_secondary_split = False
 
-            # Windows 下隐藏 audio-separator 子进程控制台窗口
-            if os.name == "nt":
-                startupinfo = subprocess.STARTUPINFO()
-                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                startupinfo.wShowWindow = 0
-                run_kwargs["startupinfo"] = startupinfo
-                run_kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+            if self.confirm_secondary_separation(vocal_path):
+                os.makedirs(harmony_dir, exist_ok=True)
+                self.set_status("> 第二阶段：正在分离干声与和声，请耐心等待...", "#FFAA00")
+                self.run_separator_command(vocal_path, harmony_dir, self.harmony_model_name)
+                did_secondary_split = True
 
-            process = subprocess.run(cmd, **run_kwargs)
-
-            # 兼容不同终端/宿主编码：优先系统首选编码，回退 utf-8 / gbk
-            preferred_enc = locale.getpreferredencoding(False) or "utf-8"
-
-            def _decode_best(raw: bytes) -> str:
-                if not raw:
-                    return ""
-                text = raw.decode(preferred_enc, errors='replace')
-                if "���" in text:
-                    for enc in ("utf-8", "gbk"):
-                        try:
-                            candidate = raw.decode(enc, errors='replace')
-                            if candidate.count("���") < text.count("���"):
-                                text = candidate
-                        except Exception:
-                            pass
-                return text
-
-            stdout = _decode_best(process.stdout)
-            stderr = _decode_best(process.stderr)
-            
-            if process.returncode == 0:
-                self.root.after(0, lambda target=target_dir: self.finish_success(target))
-            else:
-                self.root.after(0, lambda: self.finish_error(stderr))
+            status_text = (
+                "> 任务完成。已输出人声/伴奏，并完成干声/和声二次分离。"
+                if did_secondary_split
+                else "> 任务完成。已输出人声/伴奏结果。"
+            )
+            self.root.after(0, lambda target=target_dir, text=status_text: self.finish_success(target, text))
                 
         except Exception as e:
             self.root.after(0, lambda: self.finish_error(str(e)))
 
-    def finish_success(self, target_dir):
+    def finish_success(self, target_dir, status_text):
         self.btn_start.config(state=tk.NORMAL, text="开始分离")
-        self.status_label.config(text="> 任务完成。音轨已成功分离并导出到目标目录。", fg=ACCENT_COLOR)
-        messagebox.showinfo("SUCCESS", "解混完成！")
+        self.status_label.config(text=status_text, fg=ACCENT_COLOR)
         
         # 跨平台打开目录
         try:

@@ -48,6 +48,9 @@ MODEL_FILES = {
     "BS-Rofo-SW-Fixed.ckpt": [
         "https://huggingface.co/jarredou/BS-ROFO-SW-Fixed/blob/main/BS-Rofo-SW-Fixed.ckpt",
     ],
+    "mel_band_roformer_karaoke_aufr33_viperx_sdr_10.1956.ckpt": [
+        "https://github.com/TRvlvr/model_repo/releases/download/all_public_uvr_models/mel_band_roformer_karaoke_aufr33_viperx_sdr_10.1956.ckpt",
+    ],
 }
 # =================================================
 

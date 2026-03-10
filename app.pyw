@@ -2,8 +2,19 @@ import os
 import json
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MODEL_YAML_NAME = "BS-Rofo-SW-Fixed-roformer.yaml"
 DOWNLOAD_CHECKS_NAME = "download_checks.json"
+MODEL_REGISTRATIONS = [
+    {
+        "display_name": "Rofo Model: BS Rofo SW Fixed",
+        "filename": "BS-Rofo-SW-Fixed.ckpt",
+        "yaml_name": "BS-Rofo-SW-Fixed-roformer.yaml",
+    },
+    {
+        "display_name": "Roformer Model: Karaoke MelBand Roformer | (by aufr33 & viperx)",
+        "filename": "mel_band_roformer_karaoke_aufr33_viperx_sdr_10.1956.ckpt",
+        "yaml_name": "mel_band_roformer_karaoke_aufr33_viperx_sdr_10.1956_config.yaml",
+    },
+]
 
 
 def ensure_local_model_files():
@@ -19,11 +30,13 @@ def ensure_local_model_files():
         raise RuntimeError(f"模型文件检查/下载失败: {e}") from e
 
 
-def ensure_local_model_yaml():
-    """确保仓库内已提供模型 YAML 文件（不做下载/改名）。"""
-    yaml_path = os.path.join(BASE_DIR, MODEL_YAML_NAME)
-    if not os.path.exists(yaml_path):
-        raise RuntimeError(f"缺少本地 YAML 配置文件: {MODEL_YAML_NAME}")
+def ensure_local_model_yamls():
+    """确保仓库内已提供本地模型 YAML 文件（不做下载/改名）。"""
+    for model in MODEL_REGISTRATIONS:
+        yaml_name = model["yaml_name"]
+        yaml_path = os.path.join(BASE_DIR, yaml_name)
+        if not os.path.exists(yaml_path):
+            raise RuntimeError(f"缺少本地 YAML 配置文件: {yaml_name}")
 
 
 def ensure_local_download_checks():
@@ -81,29 +94,21 @@ def auto_register_model():
         pkg_dir = os.path.dirname(audio_separator.__file__)
         models_json_path = os.path.join(pkg_dir, "models.json")
 
-        # 需要注册的自定义模型列表（可按需扩展）
-        # 注意：文件名必须与项目下载文件保持一致。
-        expected_model_name = "Rofo Model: BS Rofo SW Fixed"
-        expected_model_info = {
-            "BS-Rofo-SW-Fixed.ckpt": MODEL_YAML_NAME
-        }
-
         with open(models_json_path, "r", encoding="utf-8") as f:
             models_data = json.load(f)
 
         roformer_list = models_data.get("roformer_download_list", {})
         modified = False
 
-        current_info = roformer_list.get(expected_model_name)
-        if current_info != expected_model_info:
-            roformer_list[expected_model_name] = expected_model_info
-            modified = True
-
-        # 清理错误命名：不做兼容，直接移除 Roformer 错名条目
-        wrong_names = [name for name in list(roformer_list.keys()) if "Roformer" in name]
-        for name in wrong_names:
-            roformer_list.pop(name, None)
-            modified = True
+        for model in MODEL_REGISTRATIONS:
+            expected_model_name = model["display_name"]
+            expected_model_info = {
+                model["filename"]: model["yaml_name"]
+            }
+            current_info = roformer_list.get(expected_model_name)
+            if current_info != expected_model_info:
+                roformer_list[expected_model_name] = expected_model_info
+                modified = True
 
         wrong_mapping_keys = {"BS-Roformer-SW-Fixed.ckpt"}
         wrong_mapping_vals = {"BS-Roformer-SW-Fixed.yaml", "BS-Rofo-SW-Fixed.yaml"}
@@ -129,7 +134,7 @@ if __name__ == "__main__":
     ensure_local_model_files()
 
     # 3. 确保仓库内模型 YAML 存在（不下载、不改名）
-    ensure_local_model_yaml()
+    ensure_local_model_yamls()
 
     # 4. 自动注册自定义模型到 audio-separator（首次运行时写入，之后跳过）
     auto_register_model()

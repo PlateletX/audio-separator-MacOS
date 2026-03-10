@@ -223,7 +223,8 @@
                 "Roformer Model: MelBand Roformer Kim | Inst V1 by Unwa": {"melband_roformer_inst_v1.ckpt":"config_melbandroformer_inst.yaml"},
                 "Roformer Model: MelBand Roformer Kim | Inst V2 by Unwa": {"melband_roformer_inst_v2.ckpt":"config_melbandroformer_inst_v2.yaml"},
                 "Roformer Model: MelBand Roformer Kim | InstVoc Duality V1 by Unwa": {"melband_roformer_instvoc_duality_v1.ckpt":"config_melbandroformer_instvoc_duality.yaml"},
-                "Roformer Model: MelBand Roformer Kim | InstVoc Duality V2 by Unwa": {"melband_roformer_instvox_duality_v2.ckpt":"config_melbandroformer_instvoc_duality.yaml"}
+                "Roformer Model: MelBand Roformer Kim | InstVoc Duality V2 by Unwa": {"melband_roformer_instvox_duality_v2.ckpt":"config_melbandroformer_instvoc_duality.yaml"},
+                "Roformer Model: Karaoke MelBand Roformer | (by aufr33 & viperx)": {"mel_band_roformer_karaoke_aufr33_viperx_sdr_10.1956.ckpt":"mel_band_roformer_karaoke_aufr33_viperx_sdr_10.1956_config.yaml"}
                 },
     
     "other_network_list": {
