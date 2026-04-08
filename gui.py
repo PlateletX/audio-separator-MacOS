@@ -1,4 +1,4 @@
-import tkinter as tk
+﻿import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from tkinterdnd2 import DND_FILES
 import threading
@@ -7,6 +7,7 @@ import os
 import ctypes
 import sys
 import locale
+import datetime
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -93,10 +94,10 @@ class AudioSplitterGUI:
         self.setup_dpi()
         
         self.root.title("音轨分离")
-        self.root.geometry("850x700")
-        self.root.minsize(800, 700)
+        self.root.geometry("850x900")
+        self.root.minsize(800, 900)
         self.root.configure(bg=BG_COLOR)
-        self.center_window(850, 700)
+        self.center_window(850, 900)
 
         # 变量存储
         self.input_path = tk.StringVar()
@@ -238,10 +239,22 @@ class AudioSplitterGUI:
 
         # 终端日志框
         terminal_frame = tk.Frame(op_frame, bg="#000000", bd=1, relief=tk.SUNKEN)
-        terminal_frame.pack(fill=tk.X)
-        self.status_label = tk.Label(terminal_frame, text="> 系统就绪。等待音频数据输入...", 
-                                     bg="#000000", fg=ACCENT_COLOR, font=FONT_CODE, anchor="w", padx=10, pady=10)
-        self.status_label.pack(fill=tk.X)
+        terminal_frame.pack(fill=tk.BOTH, expand=True)
+        console_scroll = tk.Scrollbar(terminal_frame)
+        console_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        self.console = tk.Text(
+            terminal_frame, bg="#000000", fg=ACCENT_COLOR, font=FONT_CODE,
+            height=12, state=tk.DISABLED, wrap=tk.WORD,
+            yscrollcommand=console_scroll.set, bd=0, padx=10, pady=8,
+            insertbackground=ACCENT_COLOR,
+        )
+        self.console.pack(fill=tk.BOTH, expand=True)
+        console_scroll.config(command=self.console.yview)
+        self.console.tag_config("accent", foreground=ACCENT_COLOR)
+        self.console.tag_config("warn",   foreground=WARN_COLOR)
+        self.console.tag_config("info",   foreground="#FFAA00")
+        self.console.tag_config("dim",    foreground="#AAAAAA")
+        self._console_append("> 系统就绪。等待音频数据输入...", "accent")
 
         # ================= 底部状态栏 =================
         bottom_frame = tk.Frame(self.root, bg=BORDER_COLOR)
@@ -254,7 +267,7 @@ class AudioSplitterGUI:
         self.segment_size.set(segment)
         self.overlap.set(overlap)
         self.batch_size.set(batch)
-        self.status_label.config(text=f"> 已加载预设: Seg={segment}, Overlap={overlap}, Batch={batch} [就绪]")
+        self._console_append(f"> 已加载预设: Seg={segment}, Overlap={overlap}, Batch={batch} [就绪]", "accent")
 
     def check_hardware(self):
         info = "GPU: "
@@ -288,8 +301,22 @@ class AudioSplitterGUI:
         if folder:
             self.output_path.set(folder)
 
+    def _console_append(self, text, tag="dim"):
+        """向控制台追加一行（可在任意线程调用）."""
+        def _do():
+            self.console.config(state=tk.NORMAL)
+            self.console.insert(tk.END, text + "\n", tag)
+            self.console.see(tk.END)
+            self.console.config(state=tk.DISABLED)
+        self.root.after(0, _do)
+
     def set_status(self, text, color):
-        self.root.after(0, lambda: self.status_label.config(text=text, fg=color))
+        tag = "info"
+        if color == ACCENT_COLOR:
+            tag = "accent"
+        elif color == WARN_COLOR:
+            tag = "warn"
+        self._console_append(text, tag)
 
     def run_separator_command(self, input_file, output_dir, model_name):
         model_dir = BASE_DIR
@@ -311,38 +338,56 @@ class AudioSplitterGUI:
         env["PATH"] = ffmpeg_bin if not current_path else ffmpeg_bin + os.pathsep + current_path
         env["AUDIO_SEPARATOR_MODEL_DIR"] = model_dir
 
-        run_kwargs = {"capture_output": True, "env": env}
+        preferred_enc = locale.getpreferredencoding(False) or "utf-8"
 
-        # Windows 下隐藏 audio-separator 子进程控制台窗口
+        def _decode_line(raw_bytes):
+            t = raw_bytes.decode(preferred_enc, errors="replace")
+            if "\ufffd\ufffd\ufffd" in t:
+                for enc in ("utf-8", "gbk"):
+                    try:
+                        c = raw_bytes.decode(enc, errors="replace")
+                        if c.count("\ufffd\ufffd\ufffd") < t.count("\ufffd\ufffd\ufffd"):
+                            t = c
+                    except Exception:
+                        pass
+            return t.rstrip()
+
+        popen_kwargs = {
+            "stdout": subprocess.PIPE,
+            "stderr": subprocess.PIPE,
+            "env": env,
+        }
         if os.name == "nt":
             startupinfo = subprocess.STARTUPINFO()
             startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
             startupinfo.wShowWindow = 0
-            run_kwargs["startupinfo"] = startupinfo
-            run_kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+            popen_kwargs["startupinfo"] = startupinfo
+            popen_kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
 
-        process = subprocess.run(cmd, **run_kwargs)
+        stderr_lines = []
+        stdout_lines = []
 
-        preferred_enc = locale.getpreferredencoding(False) or "utf-8"
+        process = subprocess.Popen(cmd, **popen_kwargs)
 
-        def _decode_best(raw: bytes) -> str:
-            if not raw:
-                return ""
-            text = raw.decode(preferred_enc, errors='replace')
-            if "���" in text:
-                for enc in ("utf-8", "gbk"):
-                    try:
-                        candidate = raw.decode(enc, errors='replace')
-                        if candidate.count("���") < text.count("���"):
-                            text = candidate
-                    except Exception:
-                        pass
-            return text
+        def _read_stream(stream, collector):
+            for raw_line in iter(stream.readline, b""):
+                line = _decode_line(raw_line)
+                collector.append(line)
+                if line.strip():
+                    self._console_append(line, "dim")
+            stream.close()
 
-        stdout = _decode_best(process.stdout)
-        stderr = _decode_best(process.stderr)
+        t_out = threading.Thread(target=_read_stream, args=(process.stdout, stdout_lines), daemon=True)
+        t_err = threading.Thread(target=_read_stream, args=(process.stderr, stderr_lines), daemon=True)
+        t_out.start()
+        t_err.start()
+        t_out.join()
+        t_err.join()
+        process.wait()
+
         if process.returncode != 0:
-            raise RuntimeError(stderr or stdout or f"audio-separator 执行失败，退出码: {process.returncode}")
+            err_text = "\n".join(stderr_lines) or "\n".join(stdout_lines) or "audio-separator \u6267\u884c\u5931\u8d25\uff0c\u9000\u51fa\u7801: " + str(process.returncode)
+            raise RuntimeError(err_text)
 
     def find_vocal_track(self, target_dir, source_base_name):
         candidates = []
@@ -393,10 +438,7 @@ class AudioSplitterGUI:
         decision_event = threading.Event()
 
         def _ask_user():
-            self.status_label.config(
-                text="> 分离完成。已获取人声轨，等待确认是否继续分离干声和和声...",
-                fg="#FFAA00"
-            )
+            self._console_append("> 分离完成。已获取人声轨，等待确认是否继续分离干声和和声...", "info")
             result["confirmed"] = messagebox.askyesno(
                 "人声分离确认",
                 "已完成六轨分离。\n\n"
@@ -415,7 +457,7 @@ class AudioSplitterGUI:
             return
         
         self.btn_start.config(state=tk.DISABLED, text="分离中... 请勿关闭窗口")
-        self.status_label.config(text="> 正在进行分离任务，请耐心等待...", fg="#FFAA00")
+        self._console_append("> 正在进行分离任务，请耐心等待...", "info")
         
         threading.Thread(target=self.run_separation, daemon=True).start()
 
@@ -452,7 +494,7 @@ class AudioSplitterGUI:
 
     def finish_success(self, target_dir, status_text):
         self.btn_start.config(state=tk.NORMAL, text="开始分离")
-        self.status_label.config(text=status_text, fg=ACCENT_COLOR)
+        self._console_append(status_text, "accent")
         
         # 跨平台打开目录
         try:
@@ -467,7 +509,7 @@ class AudioSplitterGUI:
 
     def finish_error(self, msg):
         self.btn_start.config(state=tk.NORMAL, text="开始分离")
-        self.status_label.config(text="> 任务中止。错误 🔴", fg=WARN_COLOR)
+        self._console_append("> 任务中止。错误 🔴", "warn")
         
         if "CUDA out of memory" in msg:
             friendly_msg = "显存溢出！您的参数设置超出了当前显存容量。\n\n解决办法：\n1. 降低 Batch Size（这是最耗显存的）\n2. 尝试使用[快速]或[均衡]预设"
