@@ -4,6 +4,7 @@ from tkinterdnd2 import DND_FILES
 import threading
 import subprocess
 import os
+import shutil
 import ctypes
 import sys
 import locale
@@ -24,6 +25,43 @@ def resolve_runtime_ffmpeg_bin():
         raise RuntimeError("未能初始化可用的 ffmpeg 运行时")
 
     return os.path.dirname(ffmpeg_exe)
+
+
+def resolve_audio_separator_executable():
+    exe_dir = os.path.dirname(os.path.abspath(sys.executable))
+    candidates = [
+        os.path.join(exe_dir, "Scripts", "audio-separator.exe"),
+        os.path.join(exe_dir, "Scripts", "audio-separator"),
+        os.path.join(exe_dir, "audio-separator.exe"),
+        os.path.join(exe_dir, "audio-separator"),
+        shutil.which("audio-separator"),
+    ]
+
+    for candidate in candidates:
+        if candidate and os.path.exists(candidate):
+            return candidate
+
+    raise RuntimeError("未找到 audio-separator 启动程序，请通过一键启动GUI.bat 启动，或重新部署环境。")
+
+
+def validate_runtime_model_file(model_name):
+    try:
+        from init_env import MODEL_FILES, validate_model_file
+    except Exception:
+        return
+
+    file_info = MODEL_FILES.get(model_name)
+    if not file_info:
+        return
+
+    model_path = os.path.join(BASE_DIR, model_name)
+    is_valid, invalid_reason = validate_model_file(
+        model_path,
+        file_info.get("min_size_bytes", 1),
+        file_info.get("require_zip", False),
+    )
+    if not is_valid:
+        raise RuntimeError(f"模型文件损坏或不完整：{model_name} ({invalid_reason})。请删除该文件后重新启动程序以自动下载。")
 
 try:
     import torch
@@ -320,8 +358,10 @@ class AudioSplitterGUI:
 
     def run_separator_command(self, input_file, output_dir, model_name):
         model_dir = BASE_DIR
+        validate_runtime_model_file(model_name)
+        separator_exe = resolve_audio_separator_executable()
         cmd = [
-            "audio-separator",
+            separator_exe,
             input_file,
             "--model_filename", model_name,
             "--model_file_dir", model_dir,
@@ -353,9 +393,11 @@ class AudioSplitterGUI:
             return t.rstrip()
 
         popen_kwargs = {
+            "stdin": subprocess.DEVNULL,
             "stdout": subprocess.PIPE,
             "stderr": subprocess.PIPE,
             "env": env,
+            "cwd": BASE_DIR,
         }
         if os.name == "nt":
             startupinfo = subprocess.STARTUPINFO()
@@ -367,6 +409,7 @@ class AudioSplitterGUI:
         stderr_lines = []
         stdout_lines = []
 
+        self._console_append(f"> 正在启动分离引擎: {os.path.basename(separator_exe)}", "dim")
         process = subprocess.Popen(cmd, **popen_kwargs)
 
         def _read_stream(stream, collector):
@@ -386,7 +429,7 @@ class AudioSplitterGUI:
         process.wait()
 
         if process.returncode != 0:
-            err_text = "\n".join(stderr_lines) or "\n".join(stdout_lines) or "audio-separator \u6267\u884c\u5931\u8d25\uff0c\u9000\u51fa\u7801: " + str(process.returncode)
+            err_text = "\n".join(stderr_lines) or "\n".join(stdout_lines) or f"分离引擎执行失败，退出码: {process.returncode}"
             raise RuntimeError(err_text)
 
     def find_vocal_track(self, target_dir, source_base_name):
@@ -453,7 +496,7 @@ class AudioSplitterGUI:
 
     def start_thread(self):
         if not self.input_path.get() or not self.output_path.get():
-            messagebox.showwarning("ERROR", "请输入源文件和输出路径")
+            messagebox.showwarning("提示", "请输入源文件和输出路径")
             return
         
         self.btn_start.config(state=tk.DISABLED, text="分离中... 请勿关闭窗口")
@@ -513,6 +556,9 @@ class AudioSplitterGUI:
         
         if "CUDA out of memory" in msg:
             friendly_msg = "显存溢出！您的参数设置超出了当前显存容量。\n\n解决办法：\n1. 降低 Batch Size（这是最耗显存的）\n2. 尝试使用[快速]或[均衡]预设"
-            messagebox.showerror("CUDA OOM", friendly_msg)
+            messagebox.showerror("显存不足", friendly_msg)
+        elif "模型文件损坏" in msg or "文件过小" in msg or "无法作为压缩包读取" in msg or "文件不存在" in msg:
+            friendly_msg = f"模型文件异常，无法正常加载。\n\n{msg}\n\n解决方法：\n1. 关闭程序\n2. 删除提示中提到的模型文件（.ckpt）\n3. 重新启动程序，会自动重新下载"
+            messagebox.showerror("模型文件损坏", friendly_msg)
         else:
-            messagebox.showerror("ERROR", f"引擎日志:\n{msg}")
+            messagebox.showerror("运行错误", f"引擎日志:\n{msg}")
