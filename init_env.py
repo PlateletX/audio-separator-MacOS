@@ -2,15 +2,15 @@
 init_env.py - Project-specific dependency installer
 
 Handles packages and tools that need platform detection or project-specific
-logic that should NOT live in generic bootstrap.ps1:
+logic that should NOT live in generic pyloader.ps1:
   1. PyTorch (CUDA vs CPU auto-detection)
   2. audio-separator (metadata says numpy>=2, but works fine with numpy 1.x)
   3. numpy version pin (onnxruntime 1.17.x needs numpy 1.x ABI)
   4. FFmpeg runtime via imageio-ffmpeg from domestic PyPI mirror
   5. Model files download (HuggingFace CN mirror)
 
-Standard packages go in requirements.txt (handled by bootstrap.ps1).
-Called automatically by bootstrap.ps1 during deployment.
+Standard packages go in requirements.txt (handled by pyloader.ps1).
+Called automatically by pyloader.ps1 during deployment.
 """
 import os
 import sys
@@ -63,9 +63,10 @@ MODEL_FILES = {
 }
 # =================================================
 
-ENV_DIR = "python_env"
+ENV_DIR = ".runtime/python"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-FFMPEG_RUNTIME_DIR = os.path.join(BASE_DIR, "ffmpeg_runtime")
+MODELS_DIR = os.path.join(BASE_DIR, "models")
+FFMPEG_RUNTIME_DIR = os.path.join(BASE_DIR, ".runtime", "ffmpeg")
 FFMPEG_RUNTIME_EXE = os.path.join(FFMPEG_RUNTIME_DIR, "ffmpeg.exe")
 
 
@@ -103,12 +104,13 @@ def _download_file(url: str, target_path: str, timeout: int = 120):
 
 
 def ensure_model_files():
-    """Ensure required model files exist in project root; download if missing."""
+    """确保必需的模型文件存在于 models 目录；缺失则自动下载。"""
+    os.makedirs(MODELS_DIR, exist_ok=True)
     for filename, file_info in MODEL_FILES.items():
-        local_path = os.path.join(BASE_DIR, filename)
         source_urls = file_info["urls"]
         min_size_bytes = file_info.get("min_size_bytes", 1)
         require_zip = file_info.get("require_zip", False)
+        local_path = os.path.join(MODELS_DIR, filename)
 
         is_valid, invalid_reason = validate_model_file(local_path, min_size_bytes, require_zip)
         if is_valid:

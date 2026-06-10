@@ -1,5 +1,5 @@
 # ============================================
-# Project Dependencies (installed by bootstrap.ps1 via pip)
+# Project Dependencies (installed by pyloader.ps1 via pip)
 # ============================================
 # Notes:
 #   - Standard pip packages only. No dependency conflicts here.

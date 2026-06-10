@@ -2,6 +2,7 @@ import os
 import json
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODELS_DIR = os.path.join(BASE_DIR, "models")
 DOWNLOAD_CHECKS_NAME = "download_checks.json"
 MODEL_REGISTRATIONS = [
     {
@@ -20,7 +21,7 @@ MODEL_REGISTRATIONS = [
 def ensure_local_model_files():
     """
     启动前确保本地模型文件存在。
-    解决 bootstrap 已完成后（.deploy_complete）不会再次执行 init_env.py，
+    解决 pyloader 已完成后（.deploy_complete）不会再次执行 init_env.py，
     但用户手动删除模型文件导致运行时回退网络下载失败的问题。
     """
     try:
@@ -34,14 +35,14 @@ def ensure_local_model_yamls():
     """确保仓库内已提供本地模型 YAML 文件（不做下载/改名）。"""
     for model in MODEL_REGISTRATIONS:
         yaml_name = model["yaml_name"]
-        yaml_path = os.path.join(BASE_DIR, yaml_name)
+        yaml_path = os.path.join(MODELS_DIR, yaml_name)
         if not os.path.exists(yaml_path):
             raise RuntimeError(f"缺少本地 YAML 配置文件: {yaml_name}")
 
 
 def ensure_local_download_checks():
     """确保仓库内已提供本地模型索引文件。"""
-    download_checks_path = os.path.join(BASE_DIR, DOWNLOAD_CHECKS_NAME)
+    download_checks_path = os.path.join(MODELS_DIR, DOWNLOAD_CHECKS_NAME)
     if not os.path.exists(download_checks_path) or os.path.getsize(download_checks_path) <= 0:
         raise RuntimeError(f"缺少本地模型索引文件: {DOWNLOAD_CHECKS_NAME}")
 
@@ -82,7 +83,7 @@ def configure_runtime_environment():
     """配置离线运行环境。"""
     ensure_local_download_checks()
     ensure_runtime_ffmpeg()
-    os.environ["AUDIO_SEPARATOR_MODEL_DIR"] = BASE_DIR
+    os.environ["AUDIO_SEPARATOR_MODEL_DIR"] = MODELS_DIR
 
 def auto_register_model():
     """

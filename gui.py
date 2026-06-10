@@ -11,6 +11,7 @@ import locale
 import datetime
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODELS_DIR = os.path.join(BASE_DIR, "models")
 
 
 def resolve_runtime_ffmpeg_bin():
@@ -54,7 +55,7 @@ def validate_runtime_model_file(model_name):
     if not file_info:
         return
 
-    model_path = os.path.join(BASE_DIR, model_name)
+    model_path = os.path.join(MODELS_DIR, model_name)
     is_valid, invalid_reason = validate_model_file(
         model_path,
         file_info.get("min_size_bytes", 1),
@@ -357,7 +358,7 @@ class AudioSplitterGUI:
         self._console_append(text, tag)
 
     def run_separator_command(self, input_file, output_dir, model_name):
-        model_dir = BASE_DIR
+        model_dir = MODELS_DIR
         validate_runtime_model_file(model_name)
         separator_exe = resolve_audio_separator_executable()
         cmd = [

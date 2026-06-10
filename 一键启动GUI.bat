@@ -1,9 +1,9 @@
 @echo off
-:: Project launcher - calls bootstrap.ps1 to ensure env is ready, then starts app
+:: Project launcher - calls pyloader.ps1 to ensure env is ready, then starts app
 set "ROOT=%~dp0"
-set "ENV=%ROOT%python_env"
+set "ENV=%ROOT%.runtime\python"
 set "APP=%ROOT%app.pyw"
-"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "%ROOT%bootstrap.ps1"
+"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "%ROOT%pyloader.ps1"
 if %errorlevel% neq 0 (
     echo [ERROR] Deployment failed!
     pause

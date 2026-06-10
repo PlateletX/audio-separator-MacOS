@@ -1,13 +1,13 @@
 1.部署阶段建议关闭代理。项目默认使用国内镜像安装 Python 依赖，开启代理反而可能导致网络异常。
 2.项目现在通过国内 PyPI 镜像安装 `imageio-ffmpeg`作为 FFmpeg 运行时。
-3.项目根目录的`download_checks.json`已作为本地模型索引使用。请不要删除它。
-4.如果模型文件下载到一半很慢，可尝试关闭窗口重新启动；若需重新下载模型，请先删除现有的(BS-Rofo-SW-Fixed.ckpt)。
+3.项目 `models/` 目录下的`download_checks.json`已作为本地模型索引使用。请不要删除它。
+4.如果模型文件下载到一半很慢，可尝试关闭窗口重新启动；若需重新下载模型，请先删除 `models/` 目录下现有的(BS-Rofo-SW-Fixed.ckpt)。
 5.无需理会黄色 WARNING 字样，大多数情况下不影响使用。
 6.解压时，360 等安全软件可能会拦截 `tar.exe`的解压操作，需要手动放行；`pythonw.exe`启动图形界面时也可能被拦截，放行即可。
 7.如果窗口卡住没有任何反应，尝试选中窗口敲一个回车进去，这是 Windows 旧终端插入模式特性。
 8.本项目支持无独显运行，搭配 Nvidia 显卡速度更快，推荐至少 4GB 显存。为保证速度，推荐关闭游戏以及高占用网页；纯 CPU 运行时 CPU 会长时间满载，请耐心等待。
 9.如遇到下载失败，如404、远程主机强制关闭链接等问题，可以前往网盘下载以下两个包，放到本目录，运行一键部署即可。
 https://www.123865.com/s/fuDMjv-gp05d
-`cpython-3.11.9+20240415-x86_64-pc-windows-msvc-shared-install_only.tar.gz`
-`BS-Rofo-SW-Fixed.ckpt`
-`mel_band_roformer_karaoke_aufr33_viperx_sdr_10.1956_config.yaml`
+`cpython-3.11.9+20240415-x86_64-pc-windows-msvc-shared-install_only.tar.gz`（放到 .runtime/ 目录）
+`BS-Rofo-SW-Fixed.ckpt`（放到 models/ 目录）
+`mel_band_roformer_karaoke_aufr33_viperx_sdr_10.1956_config.yaml`（放到 models/ 目录）

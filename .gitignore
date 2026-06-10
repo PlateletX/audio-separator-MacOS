@@ -1,9 +1,8 @@
 __pycache__/
-python_env/
+.python_env/
 _python_extract_temp/
+.runtime/
 requirements_processed.txt
-ffmpeg/
-ffmpeg_runtime/
 *.tar.gz
 *.ckpt
 *.wav
