@@ -80,10 +80,10 @@ PRIMARY_MODEL_NAME = "BS-Rofo-SW-Fixed.ckpt"
 HARMONY_MODEL_NAME = "mel_band_roformer_karaoke_aufr33_viperx_sdr_10.1956.ckpt"
 AUDIO_EXTENSIONS = {".wav", ".flac", ".mp3", ".m4a", ".ogg"}
 
-FONT_BASE = ("Microsoft YaHei UI", 11)
-FONT_BOLD = ("Microsoft YaHei UI", 11, "bold")
-FONT_TITLE = ("Microsoft YaHei UI", 13, "bold")
-FONT_CODE = ("Consolas", 11)
+FONT_BASE = ("Microsoft YaHei UI", 13)
+FONT_BOLD = ("Microsoft YaHei UI", 13, "bold")
+FONT_TITLE = ("Microsoft YaHei UI", 15, "bold")
+FONT_CODE = ("Consolas", 13)
 
 class ToolTip:
     def __init__(self, widget, text):
@@ -133,10 +133,10 @@ class AudioSplitterGUI:
         self.setup_dpi()
         
         self.root.title("音轨分离")
-        self.root.geometry("850x900")
-        self.root.minsize(800, 900)
+        self.root.geometry("960x1040")
+        self.root.minsize(900, 1040)
         self.root.configure(bg=BG_COLOR)
-        self.center_window(850, 900)
+        self.center_window(960, 1040)
 
         # 变量存储
         self.input_path = tk.StringVar()
@@ -150,6 +150,7 @@ class AudioSplitterGUI:
         self.overlap = tk.StringVar(value="8")
         
         self.hardware_info = tk.StringVar(value="正在扫描硬件...")
+        self.accompaniment_mode = tk.BooleanVar(value=False)
 
         self.setup_style()
         self.setup_ui()
@@ -179,14 +180,14 @@ class AudioSplitterGUI:
         # 文本标签
         style.configure("TLabel", background=PANEL_BG, foreground=TEXT_COLOR, font=FONT_BASE)
         style.configure("Green.TLabel", background=BG_COLOR, foreground=ACCENT_COLOR, font=FONT_BASE)
-        style.configure("Hardware.TLabel", background=BORDER_COLOR, foreground=ACCENT_COLOR, font=FONT_CODE, padding=4)
+        style.configure("Hardware.TLabel", background=BORDER_COLOR, foreground=ACCENT_COLOR, font=("Consolas", 13), padding=6)
         
         # 按钮
         style.configure("TButton", font=FONT_BASE, background="#333333", foreground=TEXT_COLOR, borderwidth=1, focuscolor=ACCENT_COLOR)
         style.map("TButton", background=[("active", "#444444")], foreground=[("active", "#FFFFFF")])
         
         # 主操作按钮
-        style.configure("Primary.TButton", font=("Microsoft YaHei UI", 14, "bold"), background=ACCENT_COLOR, foreground="#000000", padding=10)
+        style.configure("Primary.TButton", font=("Microsoft YaHei UI", 16, "bold"), background=ACCENT_COLOR, foreground="#000000", padding=12)
         style.map("Primary.TButton", background=[("active", ACCENT_HOVER), ("disabled", "#555555")], foreground=[("disabled", "#888888")])
         
         # 下拉框和输入框
@@ -202,79 +203,96 @@ class AudioSplitterGUI:
 
     def setup_ui(self):
 
-        main_frame = ttk.Frame(self.root, padding=(20, 0, 20, 20))
+        main_frame = ttk.Frame(self.root, padding=(24, 8, 24, 12))
         main_frame.pack(fill=tk.BOTH, expand=True)
 
         # ================= 1. 文件区 =================
-        file_frame = ttk.LabelFrame(main_frame, text="文件选择", padding=20)
-        file_frame.pack(fill=tk.X, pady=(0, 20))
+        file_frame = ttk.LabelFrame(main_frame, text="文件选择", padding=(20, 12, 20, 16))
+        file_frame.pack(fill=tk.X, pady=(0, 10))
 
-        ttk.Label(file_frame, text="待分离音频 (支持拖拽):").grid(row=0, column=0, sticky=tk.W, pady=8)
-        entry_input = ttk.Entry(file_frame, textvariable=self.input_path, width=50, font=FONT_BASE)
-        entry_input.grid(row=0, column=1, padx=15, pady=8, sticky=tk.EW)
+        ttk.Label(file_frame, text="待分离音频 (支持拖拽):").grid(row=0, column=0, sticky=tk.W, pady=4)
+        entry_input = ttk.Entry(file_frame, textvariable=self.input_path, width=55, font=FONT_BASE)
+        entry_input.grid(row=0, column=1, padx=15, pady=4, sticky=tk.EW)
         
         # 注册拖拽
         entry_input.drop_target_register(DND_FILES)
         entry_input.dnd_bind('<<Drop>>', self.handle_drop)
         
-        ttk.Button(file_frame, text="选择文件", command=self.browse_input).grid(row=0, column=2, pady=8, ipadx=5)
+        ttk.Button(file_frame, text="选择文件", command=self.browse_input).grid(row=0, column=2, pady=4, ipadx=5)
 
-        ttk.Label(file_frame, text="输出目录:").grid(row=1, column=0, sticky=tk.W, pady=8)
-        ttk.Entry(file_frame, textvariable=self.output_path, width=50, font=FONT_BASE).grid(row=1, column=1, padx=15, pady=8, sticky=tk.EW)
-        ttk.Button(file_frame, text="选择目录", command=self.browse_output).grid(row=1, column=2, pady=8, ipadx=5)
+        ttk.Label(file_frame, text="输出目录:").grid(row=1, column=0, sticky=tk.W, pady=4)
+        ttk.Entry(file_frame, textvariable=self.output_path, width=55, font=FONT_BASE).grid(row=1, column=1, padx=15, pady=4, sticky=tk.EW)
+        ttk.Button(file_frame, text="选择目录", command=self.browse_output).grid(row=1, column=2, pady=4, ipadx=5)
         
         file_frame.columnconfigure(1, weight=1)
 
         # ================= 2. 参数区 =================
-        param_frame = ttk.LabelFrame(main_frame, text="性能参数", padding=20)
-        param_frame.pack(fill=tk.X, pady=(0, 20))
+        param_frame = ttk.LabelFrame(main_frame, text="性能参数", padding=(20, 12, 20, 16))
+        param_frame.pack(fill=tk.X, pady=(0, 10))
         
         # 预设挡位按钮
         preset_frame = ttk.Frame(param_frame, style="Panel.TFrame")
-        preset_frame.grid(row=0, column=0, columnspan=4, sticky=tk.EW, pady=(0, 20))
+        preset_frame.grid(row=0, column=0, columnspan=4, sticky=tk.EW, pady=(0, 12))
         ttk.Label(preset_frame, text="快速加载算力配置:", foreground=TEXT_COLOR).pack(side=tk.LEFT, padx=(0, 15))
         
         btn_fast = ttk.Button(preset_frame, text="⚡ 快速", command=lambda: self.apply_preset("256", "2", "4"))
-        btn_fast.pack(side=tk.LEFT, padx=5, ipadx=5)
+        btn_fast.pack(side=tk.LEFT, padx=5, ipadx=8)
         ToolTip(btn_fast, "Segment: 256 | Overlap: 4 | Batch: 4\n速度最快，适合快速提取或无CUDA设备。")
 
         btn_bal = ttk.Button(preset_frame, text="⚖️ 均衡", command=lambda: self.apply_preset("512", "8", "8"))
-        btn_bal.pack(side=tk.LEFT, padx=5, ipadx=5)
+        btn_bal.pack(side=tk.LEFT, padx=5, ipadx=8)
         ToolTip(btn_bal, "Segment: 512 | Overlap: 8 | Batch: 8\n推荐日常使用，完美平衡质量与速度。")
 
         btn_high = ttk.Button(preset_frame, text="💎 极致 (约3.0G 显存)", command=lambda: self.apply_preset("1024", "8", "16"))
-        btn_high.pack(side=tk.LEFT, padx=5, ipadx=5)
+        btn_high.pack(side=tk.LEFT, padx=5, ipadx=8)
         ToolTip(btn_high, "Segment: 1024 | Overlap: 8 | Batch: 16\n捕获更宽频段，音质最高。")
 
         # 详细参数
-        ttk.Label(param_frame, text="Segment Size:").grid(row=1, column=0, sticky=tk.W, pady=10)
+        ttk.Label(param_frame, text="Segment Size:").grid(row=1, column=0, sticky=tk.W, pady=6)
         seg_combo = ttk.Combobox(param_frame, textvariable=self.segment_size, values=["256", "512", "768", "1024"], width=12, state="readonly", font=FONT_BASE)
-        seg_combo.grid(row=1, column=1, sticky=tk.W, padx=15, pady=10)
+        seg_combo.grid(row=1, column=1, sticky=tk.W, padx=15, pady=6)
         ToolTip(seg_combo, "音频频段分析块大小。数值越大，模型能看到的上下文越长，分离更精准，但显存占用线性增加。")
 
-        ttk.Label(param_frame, text="Overlap:").grid(row=1, column=2, sticky=tk.W, pady=10, padx=(20, 0))
+        ttk.Label(param_frame, text="Overlap:").grid(row=1, column=2, sticky=tk.W, pady=6, padx=(20, 0))
         ov_combo = ttk.Combobox(param_frame, textvariable=self.overlap, values=["2", "4", "8", "16"], width=12, state="readonly", font=FONT_BASE)
-        ov_combo.grid(row=1, column=3, sticky=tk.W, padx=15, pady=10)
+        ov_combo.grid(row=1, column=3, sticky=tk.W, padx=15, pady=6)
         ToolTip(ov_combo, "段与段之间的重叠淡入淡出次数。值越大接缝伪影越少。8以上几乎无收益，且会增加处理时间。")
 
-        ttk.Label(param_frame, text="Batch Size:").grid(row=2, column=0, sticky=tk.W, pady=10)
+        ttk.Label(param_frame, text="Batch Size:").grid(row=2, column=0, sticky=tk.W, pady=6)
         batch_combo = ttk.Combobox(param_frame, textvariable=self.batch_size, values=["1", "2", "4", "8", "12", "16", "24"], width=12, state="readonly", font=FONT_BASE)
-        batch_combo.grid(row=2, column=1, sticky=tk.W, padx=15, pady=10)
+        batch_combo.grid(row=2, column=1, sticky=tk.W, padx=15, pady=6)
         ToolTip(batch_combo, "并发处理批次数。越大计算效率越高，对音质无影响，但会消耗显存。遇到显存耗尽时请调小。")
 
-        ttk.Label(param_frame, text="Export Format:").grid(row=2, column=2, sticky=tk.W, pady=10, padx=(20, 0))
+        ttk.Label(param_frame, text="Export Format:").grid(row=2, column=2, sticky=tk.W, pady=6, padx=(20, 0))
         fmt_combo = ttk.Combobox(param_frame, textvariable=self.out_format, values=["WAV", "FLAC", "MP3"], width=12, state="readonly", font=FONT_BASE)
-        fmt_combo.grid(row=2, column=3, sticky=tk.W, padx=15, pady=10)
+        fmt_combo.grid(row=2, column=3, sticky=tk.W, padx=15, pady=6)
+
+        chk_accomp = tk.Checkbutton(
+            param_frame, text="伴奏模式  (六轨分离后自动合并非人声为伴奏)",
+            variable=self.accompaniment_mode, font=FONT_BASE,
+            bg=PANEL_BG, fg=TEXT_COLOR, selectcolor="#2D2D30",
+            activebackground=PANEL_BG, activeforeground=TEXT_COLOR,
+            highlightthickness=0, relief=tk.FLAT, bd=0,
+        )
+        chk_accomp.grid(row=3, column=0, columnspan=4, sticky=tk.W, pady=(6, 0))
+        ToolTip(chk_accomp, "勾选后，六轨分离完成会自动将 piano/guitar/bass/drum/other 合成为一条伴奏音轨，\n文件名以【伴奏】开头，输出在同一目录下。")
         
         param_frame.columnconfigure(1, weight=1)
         param_frame.columnconfigure(3, weight=1)
 
         # ================= 3. 操作区 =================
         op_frame = ttk.Frame(main_frame)
-        op_frame.pack(fill=tk.BOTH, expand=True, pady=10)
+        op_frame.pack(fill=tk.BOTH, expand=True, pady=4)
 
         self.btn_start = ttk.Button(op_frame, text="开始分离", style="Primary.TButton", command=self.start_thread)
-        self.btn_start.pack(pady=(15, 25), ipadx=30, ipady=10)
+        self.btn_start.pack(pady=(8, 6), ipadx=36, ipady=10)
+
+        btn_row = ttk.Frame(op_frame, style="Panel.TFrame")
+        btn_row.pack(fill=tk.X, pady=(0, 8))
+        self.btn_vocal = ttk.Button(btn_row, text="手动分离人声", command=self.start_manual_vocal_separation)
+        self.btn_vocal.pack(side=tk.LEFT, padx=(0, 10), ipadx=5)
+        ToolTip(self.btn_vocal, "选择一条人声音频，直接执行干声/和声分离（跳过六轨阶段）。\n适用于已有现成人声文件的场景。")
+        ttk.Label(btn_row, text="← 可单独选择人声文件进行干声/和声分离", foreground="#666666", font=FONT_BASE).pack(side=tk.LEFT)
 
         # 终端日志框
         terminal_frame = tk.Frame(op_frame, bg="#000000", bd=1, relief=tk.SUNKEN)
@@ -300,7 +318,7 @@ class AudioSplitterGUI:
         bottom_frame.pack(side=tk.BOTTOM, fill=tk.X)
         
         hw_label = ttk.Label(bottom_frame, textvariable=self.hardware_info, style="Hardware.TLabel")
-        hw_label.pack(side=tk.LEFT, padx=10, pady=2)
+        hw_label.pack(side=tk.LEFT, padx=12, pady=4)
 
     def apply_preset(self, segment, overlap, batch):
         self.segment_size.set(segment)
@@ -374,6 +392,7 @@ class AudioSplitterGUI:
         ]
 
         env = os.environ.copy()
+        env["PYTHONUNBUFFERED"] = "1"
         ffmpeg_bin = resolve_runtime_ffmpeg_bin()
         current_path = env.get("PATH", "")
         env["PATH"] = ffmpeg_bin if not current_path else ffmpeg_bin + os.pathsep + current_path
@@ -501,6 +520,7 @@ class AudioSplitterGUI:
             return
         
         self.btn_start.config(state=tk.DISABLED, text="分离中... 请勿关闭窗口")
+        self.btn_vocal.config(state=tk.DISABLED)
         self._console_append("> 正在进行分离任务，请耐心等待...", "info")
         
         threading.Thread(target=self.run_separation, daemon=True).start()
@@ -516,6 +536,9 @@ class AudioSplitterGUI:
 
             self.set_status("> 第一阶段：正在分离人声与伴奏，请耐心等待...", "#FFAA00")
             self.run_separator_command(input_file, target_dir, self.model_name)
+
+            if self.accompaniment_mode.get():
+                self.merge_accompaniment(target_dir, base_name)
 
             vocal_path = self.find_vocal_track(target_dir, base_name)
             did_secondary_split = False
@@ -536,8 +559,80 @@ class AudioSplitterGUI:
         except Exception as e:
             self.root.after(0, lambda: self.finish_error(str(e)))
 
+    def merge_accompaniment(self, target_dir, base_name):
+        """将六轨中非人声音轨叠加合并为一条伴奏文件。"""
+        from pydub import AudioSegment
+
+        vocal_keywords = {"vocal", "vocals", "voice"}
+
+        accompaniment_files = []
+        for filename in os.listdir(target_dir):
+            file_path = os.path.join(target_dir, filename)
+            if not os.path.isfile(file_path):
+                continue
+            ext = os.path.splitext(filename)[1].lower()
+            if ext not in AUDIO_EXTENSIONS:
+                continue
+            name_lower = filename.lower()
+            if any(kw in name_lower for kw in vocal_keywords):
+                continue
+            accompaniment_files.append(file_path)
+
+        if not accompaniment_files:
+            self._console_append("> 未找到非人声音轨，跳过伴奏合并。", "warn")
+            return
+
+        self._console_append(f"> 正在合并 {len(accompaniment_files)} 条音轨为伴奏...", "info")
+        mixed = None
+        for fp in accompaniment_files:
+            seg = AudioSegment.from_file(fp)
+            if mixed is None:
+                mixed = seg
+            else:
+                mixed = mixed.overlay(seg)
+
+        fmt = self.out_format.get().lower()
+        output_name = f"【伴奏】{base_name}.{fmt}"
+        output_path = os.path.join(target_dir, output_name)
+        mixed.export(output_path, format=fmt)
+        self._console_append(f"> 伴奏已生成: {output_name}", "accent")
+
+    def start_manual_vocal_separation(self):
+        """手动选择人声文件，直接进行干声/和声分离。"""
+        file = filedialog.askopenfilename(
+            title="选择人声音频文件",
+            filetypes=[("Audio Files", "*.wav *.flac *.mp3 *.m4a *.ogg")],
+        )
+        if not file:
+            return
+
+        if not self.output_path.get():
+            self.output_path.set(os.path.dirname(file))
+
+        self.btn_vocal.config(state=tk.DISABLED, text="分离中...")
+        self.btn_start.config(state=tk.DISABLED)
+        threading.Thread(target=self._run_manual_vocal_separation, args=(file,), daemon=True).start()
+
+    def _run_manual_vocal_separation(self, vocal_file):
+        try:
+            base_name = os.path.splitext(os.path.basename(vocal_file))[0]
+            output_dir = os.path.join(self.output_path.get(), base_name, "02_干声和声")
+            os.makedirs(output_dir, exist_ok=True)
+
+            self.set_status("> 手动模式：正在分离干声与和声，请耐心等待...", "#FFAA00")
+            self.run_separator_command(vocal_file, output_dir, self.harmony_model_name)
+
+            self.root.after(0, lambda: self.btn_vocal.config(state=tk.NORMAL, text="手动分离人声"))
+            self.root.after(0, lambda: self.btn_start.config(state=tk.NORMAL))
+            self.root.after(0, lambda d=output_dir: self.finish_success(d, "> 人声分离完成。已输出干声/和声。"))
+        except Exception as e:
+            self.root.after(0, lambda: self.btn_vocal.config(state=tk.NORMAL, text="手动分离人声"))
+            self.root.after(0, lambda: self.btn_start.config(state=tk.NORMAL))
+            self.root.after(0, lambda: self.finish_error(str(e)))
+
     def finish_success(self, target_dir, status_text):
         self.btn_start.config(state=tk.NORMAL, text="开始分离")
+        self.btn_vocal.config(state=tk.NORMAL)
         self._console_append(status_text, "accent")
         
         # 跨平台打开目录
@@ -553,6 +648,7 @@ class AudioSplitterGUI:
 
     def finish_error(self, msg):
         self.btn_start.config(state=tk.NORMAL, text="开始分离")
+        self.btn_vocal.config(state=tk.NORMAL)
         self._console_append("> 任务中止。错误 🔴", "warn")
         
         if "CUDA out of memory" in msg:

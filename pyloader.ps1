@@ -90,7 +90,8 @@ function Resolve-PythonArchive {
         Exit-WithError "Failed to query mirror index: $($_.Exception.Message)"
     }
 
-    $pattern = '^/github-release/astral-sh/python-build-standalone/LatestRelease/cpython-(3\.13\.\d+)%2B(\d+)-x86_64-pc-windows-msvc-install_only\.tar\.gz$'
+    $escaped = [regex]::Escape($PythonMajorMinor)
+    $pattern = "^/github-release/astral-sh/python-build-standalone/LatestRelease/cpython-($escaped\.\d+)%2B(\d+)-x86_64-pc-windows-msvc-install_only\.tar\.gz$"
     $candidates = @()
 
     foreach ($link in $resp.Links) {
