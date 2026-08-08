@@ -252,24 +252,24 @@ class AudioSplitterGUI:
         btn_fast.pack(side=tk.LEFT, padx=5, ipadx=8)
         ToolTip(btn_fast, "自动片段 | 窗口步长 8 秒 | CUDA 自动混合精度\n窗口重叠较少，通常更快；适合先快速试跑，不代表音质更好。")
 
-        btn_bal = ttk.Button(preset_frame, text="⚖️ 均衡", command=lambda: self.apply_preset("自动", "4", True))
+        btn_bal = ttk.Button(preset_frame, text="⚖️ 推荐", command=lambda: self.apply_preset("自动", "4", True))
         btn_bal.pack(side=tk.LEFT, padx=5, ipadx=8)
-        ToolTip(btn_bal, "自动片段 | 窗口步长 4 秒 | CUDA 自动混合精度\n速度和窗口重叠量折中，适合日常使用；不保证音质更高。")
+        ToolTip(btn_bal, "自动模型窗口 | 窗口步长 4 秒 | CUDA 自动混合精度\n速度、接缝处理和资源占用的甜点档，推荐日常使用。")
 
-        btn_high = ttk.Button(preset_frame, text="💎 极致", command=lambda: self.apply_preset("1024", "2", False))
+        btn_high = ttk.Button(preset_frame, text="💎 质量优先", command=lambda: self.apply_preset("自动", "2", True))
         btn_high.pack(side=tk.LEFT, padx=5, ipadx=8)
-        ToolTip(btn_high, "手动片段 1024 | 窗口步长 2 秒 | 关闭自动混合精度\n实验性高负载设置：覆盖模型默认片段，窗口重叠更多，通常更慢；不保证音质更好，显存不足不要选。")
+        ToolTip(btn_high, "自动模型窗口 | 窗口步长 2 秒 | CUDA 自动混合精度\n窗口最多、通常最慢；可能减少接缝影响，但不保证音质一定提升，显存不足不要选。")
 
         # 详细参数
         ttk.Label(param_frame, text="模型分析窗口:").grid(row=1, column=0, sticky=tk.W, pady=6)
         seg_combo = ttk.Combobox(param_frame, textvariable=self.segment_size, values=["自动", "256", "512", "768", "1024"], width=12, state="readonly", font=FONT_BASE)
         seg_combo.grid(row=1, column=1, sticky=tk.W, padx=15, pady=6)
-        ToolTip(seg_combo, "自动：使用当前模型自带的默认值（推荐）。手动数值会覆盖默认值，用于实验。\n它不是音频时长；数值越大，单个分析窗口通常越占显存、耗时越长，可能改善部分音频，但不保证音质更好。\n显存不足时优先使用自动或较小数值。")
+        ToolTip(seg_combo, "自动：使用模型自带的分析窗口（推荐）。手动调小：更省显存、更快，但模型一次看到的声音更短，可能影响复杂声音的判断；手动调大：更占显存、更慢，可能改善部分音频，但不保证音质提升。\n它不是音频时长；手动值只在覆盖模型默认值时生效。显存不足优先选自动或较小数值。")
 
         ttk.Label(param_frame, text="窗口步长（秒）:").grid(row=1, column=2, sticky=tk.W, pady=6, padx=(20, 0))
         ov_combo = ttk.Combobox(param_frame, textvariable=self.overlap, values=["2", "4", "8"], width=12, state="readonly", font=FONT_BASE)
         ov_combo.grid(row=1, column=3, sticky=tk.W, padx=15, pady=6)
-        ToolTip(ov_combo, "这是相邻分析窗口起点之间的间隔，不是“重叠次数”。\n数值越小，窗口重叠越多，通常更慢，并可能减少窗口边界影响；数值越大，窗口更少，通常更快。\n它主要影响窗口数量、总耗时和窗口边界处理，不能直接降低单个窗口的峰值显存；实际步长不会超过模型自身的窗口长度。")
+        ToolTip(ov_combo, "窗口步长就是相邻窗口开始位置的间隔：8 秒窗口少，通常最快但接缝处理最少；4 秒窗口约多一倍，速度和接缝处理折中；2 秒窗口约多四倍，通常最慢，可能减少接缝影响。\n它不降低单个窗口的峰值显存；过大的步长还可能被模型窗口长度限制。")
 
         ttk.Label(param_frame, text="导出格式:").grid(row=2, column=0, sticky=tk.W, pady=6)
         fmt_combo = ttk.Combobox(param_frame, textvariable=self.out_format, values=["WAV", "FLAC", "MP3"], width=12, state="readonly", font=FONT_BASE)
@@ -283,7 +283,7 @@ class AudioSplitterGUI:
             highlightthickness=0, relief=tk.FLAT, bd=0,
         )
         chk_autocast.grid(row=2, column=2, columnspan=2, sticky=tk.W, padx=(20, 0), pady=6)
-        ToolTip(chk_autocast, "仅 CUDA 设备会尝试使用 --use_autocast。开启后通常更省显存、可能更快，但效果取决于显卡，结果也可能有轻微数值差异；CPU 不使用此选项。")
+        ToolTip(chk_autocast, "开启：CUDA 推理通常更快、更省显存，当前模型测试中输出差异很小，建议保持开启。关闭：通常更慢、更占显存，没有测出质量收益；只建议排查兼容性时尝试。CPU 不使用此选项。")
 
         chk_accomp = tk.Checkbutton(
             param_frame, text="伴奏模式  (保留六轨并额外合并非人声为伴奏)",
@@ -848,7 +848,7 @@ class AudioSplitterGUI:
         self._console_append("> 任务中止。错误 🔴", "warn")
         
         if "CUDA out of memory" in msg:
-            friendly_msg = "显卡在当前设置下显存不足。\n\n解决办法：\n1. 开启“CUDA 自动混合精度”（仅 CUDA 有效，通常可降低推理显存）\n2. 将“模型分析窗口”调回“自动”或选择更小的手动值\n3. 尝试使用“快速”或“均衡”预设\n\n注意：窗口步长主要影响窗口数量、总耗时和窗口边界处理，不能直接降低单个窗口的峰值显存。"
+            friendly_msg = "显卡在当前设置下显存不足。\n\n解决办法：\n1. 开启“CUDA 自动混合精度”（通常更省显存）\n2. 将“模型分析窗口”调回“自动”或选择更小的手动值（直接降低单窗口负载）\n3. 仍不足时使用“快速”预设\n\n注意：窗口步长主要减少窗口数量和总耗时，不能解决单个窗口的峰值显存。"
             messagebox.showerror("显存不足", friendly_msg)
         elif "模型文件损坏" in msg or "文件过小" in msg or "无法作为压缩包读取" in msg or "文件不存在" in msg:
             friendly_msg = f"模型文件异常，无法正常加载。\n\n{msg}\n\n解决方法：\n1. 关闭程序\n2. 删除提示中提到的模型文件（.ckpt）\n3. 重新启动程序，会自动重新下载"
