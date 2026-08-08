@@ -140,6 +140,8 @@ class AudioSplitterGUI:
 
         # 变量存储
         self.input_path = tk.StringVar()
+        self.input_files = []
+        self.input_summary = tk.StringVar(value="未选择音频文件")
         self.output_path = tk.StringVar()
         self.model_name = PRIMARY_MODEL_NAME
         self.harmony_model_name = HARMONY_MODEL_NAME
@@ -150,7 +152,7 @@ class AudioSplitterGUI:
         self.overlap = tk.StringVar(value="8")
         
         self.hardware_info = tk.StringVar(value="正在扫描硬件...")
-        self.accompaniment_mode = tk.BooleanVar(value=False)
+        self.accompaniment_mode = tk.BooleanVar(value=True)
 
         self.setup_style()
         self.setup_ui()
@@ -218,11 +220,22 @@ class AudioSplitterGUI:
         entry_input.drop_target_register(DND_FILES)
         entry_input.dnd_bind('<<Drop>>', self.handle_drop)
         
-        ttk.Button(file_frame, text="选择文件", command=self.browse_input).grid(row=0, column=2, pady=4, ipadx=5)
+        self.btn_browse_input = ttk.Button(file_frame, text="选择文件", command=self.browse_input)
+        self.btn_browse_input.grid(row=0, column=2, pady=4, ipadx=5)
+        self.btn_browse_batch = ttk.Button(file_frame, text="批量选择", command=self.browse_batch_input)
+        self.btn_browse_batch.grid(row=0, column=3, padx=(8, 0), pady=4, ipadx=5)
 
         ttk.Label(file_frame, text="输出目录:").grid(row=1, column=0, sticky=tk.W, pady=4)
         ttk.Entry(file_frame, textvariable=self.output_path, width=55, font=FONT_BASE).grid(row=1, column=1, padx=15, pady=4, sticky=tk.EW)
-        ttk.Button(file_frame, text="选择目录", command=self.browse_output).grid(row=1, column=2, pady=4, ipadx=5)
+        self.btn_browse_output = ttk.Button(file_frame, text="选择目录", command=self.browse_output)
+        self.btn_browse_output.grid(row=1, column=2, columnspan=2, pady=4, ipadx=5)
+
+        ttk.Label(
+            file_frame,
+            textvariable=self.input_summary,
+            foreground="#888888",
+            font=("Microsoft YaHei UI", 11),
+        ).grid(row=2, column=0, columnspan=4, sticky=tk.W, pady=(3, 0))
         
         file_frame.columnconfigure(1, weight=1)
 
@@ -268,14 +281,14 @@ class AudioSplitterGUI:
         fmt_combo.grid(row=2, column=3, sticky=tk.W, padx=15, pady=6)
 
         chk_accomp = tk.Checkbutton(
-            param_frame, text="伴奏模式  (六轨分离后自动合并非人声为伴奏)",
+            param_frame, text="伴奏模式  (保留六轨并额外合并非人声为伴奏)",
             variable=self.accompaniment_mode, font=FONT_BASE,
             bg=PANEL_BG, fg=TEXT_COLOR, selectcolor="#2D2D30",
             activebackground=PANEL_BG, activeforeground=TEXT_COLOR,
             highlightthickness=0, relief=tk.FLAT, bd=0,
         )
         chk_accomp.grid(row=3, column=0, columnspan=4, sticky=tk.W, pady=(6, 0))
-        ToolTip(chk_accomp, "勾选后，六轨分离完成会自动将 piano/guitar/bass/drum/other 合成为一条伴奏音轨，\n文件名以【伴奏】开头，输出在同一目录下。")
+        ToolTip(chk_accomp, "六轨文件会正常保留；勾选后会额外将 piano/guitar/bass/drum/other 合成为一条伴奏音轨，\n文件名以【伴奏】开头，输出在同一目录下。")
         
         param_frame.columnconfigure(1, weight=1)
         param_frame.columnconfigure(3, weight=1)
@@ -340,18 +353,85 @@ class AudioSplitterGUI:
         
         self.root.after(0, lambda: self.hardware_info.set(info))
 
+    def _set_input_files(self, paths):
+        """更新待处理文件列表，并同步单文件显示和默认输出目录。"""
+        normalized = []
+        for raw_path in paths:
+            if not raw_path:
+                continue
+
+            path = os.path.normpath(os.path.abspath(os.path.expanduser(str(raw_path))))
+            if not os.path.isfile(path):
+                continue
+            if os.path.splitext(path)[1].lower() not in AUDIO_EXTENSIONS:
+                continue
+            if path not in normalized:
+                normalized.append(path)
+
+        self.input_files = normalized
+        if not normalized:
+            self.input_path.set("")
+            self.input_summary.set("未选择音频文件")
+            return
+
+        self.input_path.set(normalized[0])
+        self.input_summary.set(f"已选择 {len(normalized)} 个音频文件")
+        if not self.output_path.get().strip():
+            self.output_path.set(os.path.dirname(normalized[0]))
+
+    def _get_selected_input_files(self):
+        """读取当前待处理文件列表，并兼容用户手动输入单个路径。"""
+        selected = list(self.input_files)
+        typed_path = self.input_path.get().strip()
+
+        if not selected and typed_path:
+            selected = [typed_path]
+        elif len(selected) == 1 and typed_path:
+            typed_normalized = os.path.normcase(
+                os.path.abspath(os.path.expanduser(typed_path))
+            )
+            selected_normalized = os.path.normcase(os.path.abspath(selected[0]))
+            if typed_normalized != selected_normalized:
+                selected = [typed_path]
+
+        return [
+            os.path.normpath(os.path.abspath(os.path.expanduser(path)))
+            for path in selected
+            if path
+        ]
+
+    def _set_busy(self, busy, busy_text="分离中... 请勿关闭窗口"):
+        """统一切换处理期间的控件状态。"""
+        state = tk.DISABLED if busy else tk.NORMAL
+        for button in (
+            self.btn_browse_input,
+            self.btn_browse_batch,
+            self.btn_browse_output,
+        ):
+            button.config(state=state)
+
+        self.btn_start.config(
+            state=state,
+            text=busy_text if busy else "开始分离",
+        )
+        self.btn_vocal.config(state=state)
+
     def handle_drop(self, event):
-        file_path = event.data.strip('{}')
-        self.input_path.set(file_path)
-        if not self.output_path.get():
-            self.output_path.set(os.path.dirname(file_path))
+        paths = self.root.tk.splitlist(event.data)
+        self._set_input_files(paths)
 
     def browse_input(self):
         file = filedialog.askopenfilename(filetypes=[("Audio Files", "*.wav *.flac *.mp3 *.m4a *.ogg")])
         if file:
-            self.input_path.set(file)
-            if not self.output_path.get():
-                self.output_path.set(os.path.dirname(file))
+            self._set_input_files([file])
+
+    def browse_batch_input(self):
+        files = filedialog.askopenfilenames(
+            title="选择要批量分离的音频文件",
+            filetypes=[("Audio Files", "*.wav *.flac *.mp3 *.m4a *.ogg")],
+        )
+        if files:
+            self._set_input_files(files)
 
     def browse_output(self):
         folder = filedialog.askdirectory()
@@ -462,6 +542,8 @@ class AudioSplitterGUI:
                 continue
             if os.path.splitext(filename)[1].lower() not in AUDIO_EXTENSIONS:
                 continue
+            if filename.startswith("【伴奏】"):
+                continue
             candidates.append(file_path)
 
         if not candidates:
@@ -496,17 +578,21 @@ class AudioSplitterGUI:
 
         return best_match
 
-    def confirm_secondary_separation(self, vocal_path):
+    def confirm_secondary_separation(self, vocal_path, batch_count=1):
         result = {"confirmed": False}
         decision_event = threading.Event()
 
         def _ask_user():
             self._console_append("> 分离完成。已获取人声轨，等待确认是否继续分离干声和和声...", "info")
+            if batch_count > 1:
+                question = f"是否对本批次的 {batch_count} 个文件都继续进行干声/和声分离？"
+            else:
+                question = "是否继续分离人声为干声/和声？"
             result["confirmed"] = messagebox.askyesno(
                 "人声分离确认",
                 "已完成六轨分离。\n\n"
                 f"人声轨已提取：\n{os.path.basename(vocal_path)}\n\n"
-                "是否继续分离人声为干声/和声？"
+                f"{question}"
             )
             decision_event.set()
 
@@ -515,49 +601,143 @@ class AudioSplitterGUI:
         return result["confirmed"]
 
     def start_thread(self):
-        if not self.input_path.get() or not self.output_path.get():
+        input_files = self._get_selected_input_files()
+        output_dir = self.output_path.get().strip()
+
+        if not input_files or not output_dir:
             messagebox.showwarning("提示", "请输入源文件和输出路径")
             return
-        
-        self.btn_start.config(state=tk.DISABLED, text="分离中... 请勿关闭窗口")
-        self.btn_vocal.config(state=tk.DISABLED)
-        self._console_append("> 正在进行分离任务，请耐心等待...", "info")
-        
-        threading.Thread(target=self.run_separation, daemon=True).start()
 
-    def run_separation(self):
+        missing_files = [path for path in input_files if not os.path.isfile(path)]
+        if missing_files:
+            missing_names = "\n".join(os.path.basename(path) for path in missing_files[:5])
+            if len(missing_files) > 5:
+                missing_names += f"\n以及其他 {len(missing_files) - 5} 个文件"
+            messagebox.showwarning("提示", f"以下音频文件不存在或已被移除：\n{missing_names}")
+            return
+        
+        self._set_busy(True)
+        self._console_append(f"> 已开始处理 {len(input_files)} 个音频文件，请耐心等待...", "info")
+        
+        threading.Thread(
+            target=self.run_separation,
+            args=(tuple(input_files), output_dir, self.accompaniment_mode.get()),
+            daemon=True,
+        ).start()
+
+    def resolve_output_dir(self, output_root, base_name, reserved_dirs):
+        """为批量任务生成不冲突的同名输出目录。"""
+        target_dir = os.path.join(output_root, base_name)
+        suffix = 2
+        while os.path.normcase(os.path.abspath(target_dir)) in reserved_dirs:
+            target_dir = os.path.join(output_root, f"{base_name} ({suffix})")
+            suffix += 1
+
+        reserved_dirs.add(os.path.normcase(os.path.abspath(target_dir)))
+        return target_dir
+
+    def run_separation(self, input_files=None, output_root=None, accompaniment_enabled=None):
+        """按顺序处理一个或多个音频文件，并汇总批量任务结果。"""
+        input_files = list(input_files or self._get_selected_input_files())
+        output_root = (output_root or self.output_path.get()).strip()
+        if accompaniment_enabled is None:
+            accompaniment_enabled = self.accompaniment_mode.get()
+
+        if not input_files or not output_root:
+            self.root.after(0, lambda: self.finish_error("未找到可处理的音频文件或输出目录。"))
+            return
+
+        succeeded = []
+        failed = []
+        reserved_dirs = set()
+        secondary_choice = None
+        total = len(input_files)
+
         try:
-            input_file = self.input_path.get()
-            base_name = os.path.splitext(os.path.basename(input_file))[0]
-            target_dir = os.path.join(self.output_path.get(), base_name)
-            harmony_dir = os.path.join(target_dir, "02_干声和声")
-            
-            os.makedirs(target_dir, exist_ok=True)
-
-            self.set_status("> 第一阶段：正在分离人声与伴奏，请耐心等待...", "#FFAA00")
-            self.run_separator_command(input_file, target_dir, self.model_name)
-
-            if self.accompaniment_mode.get():
-                self.merge_accompaniment(target_dir, base_name)
-
-            vocal_path = self.find_vocal_track(target_dir, base_name)
-            did_secondary_split = False
-
-            if self.confirm_secondary_separation(vocal_path):
-                os.makedirs(harmony_dir, exist_ok=True)
-                self.set_status("> 第二阶段：正在分离干声与和声，请耐心等待...", "#FFAA00")
-                self.run_separator_command(vocal_path, harmony_dir, self.harmony_model_name)
-                did_secondary_split = True
-
-            status_text = (
-                "> 任务完成。已输出人声/伴奏，并完成干声/和声二次分离。"
-                if did_secondary_split
-                else "> 任务完成。已输出人声/伴奏结果。"
-            )
-            self.root.after(0, lambda target=target_dir, text=status_text: self.finish_success(target, text))
-                
+            os.makedirs(output_root, exist_ok=True)
         except Exception as e:
-            self.root.after(0, lambda: self.finish_error(str(e)))
+            self.root.after(0, lambda msg=str(e): self.finish_error(msg))
+            return
+
+        for index, input_file in enumerate(input_files, start=1):
+            source_base_name = os.path.splitext(os.path.basename(input_file))[0]
+            target_dir = self.resolve_output_dir(output_root, source_base_name, reserved_dirs)
+            harmony_dir = os.path.join(target_dir, "02_干声和声")
+
+            try:
+                os.makedirs(target_dir, exist_ok=True)
+                self.set_status(
+                    f"> 批量任务 {index}/{total}：正在分离 {os.path.basename(input_file)}...",
+                    "#FFAA00",
+                )
+                self.run_separator_command(input_file, target_dir, self.model_name)
+
+                if accompaniment_enabled:
+                    self.merge_accompaniment(target_dir, source_base_name)
+
+                vocal_path = self.find_vocal_track(target_dir, source_base_name)
+                did_secondary_split = False
+
+                if secondary_choice is None:
+                    secondary_choice = self.confirm_secondary_separation(
+                        vocal_path,
+                        batch_count=total,
+                    )
+
+                if secondary_choice:
+                    os.makedirs(harmony_dir, exist_ok=True)
+                    self.set_status(
+                        f"> 批量任务 {index}/{total}：正在分离干声与和声...",
+                        "#FFAA00",
+                    )
+                    self.run_separator_command(vocal_path, harmony_dir, self.harmony_model_name)
+                    did_secondary_split = True
+
+                succeeded.append(
+                    {
+                        "input_file": input_file,
+                        "target_dir": target_dir,
+                        "secondary": did_secondary_split,
+                    }
+                )
+                self._console_append(
+                    f"> 批量任务 {index}/{total} 完成，输出目录：{target_dir}",
+                    "accent",
+                )
+            except Exception as e:
+                error_text = str(e)
+                failed.append({"input_file": input_file, "error": error_text})
+                self._console_append(
+                    f"> 批量任务 {index}/{total} 失败：{os.path.basename(input_file)}\n{error_text}",
+                    "warn",
+                )
+
+        if not succeeded:
+            details = "\n\n".join(
+                f"{os.path.basename(item['input_file'])}: {item['error']}"
+                for item in failed
+            )
+            self.root.after(0, lambda msg=details: self.finish_error(msg or "批量任务失败。"))
+            return
+
+        if total == 1:
+            did_secondary_split = succeeded[0]["secondary"]
+            if did_secondary_split:
+                status_text = "> 任务完成。六轨文件已保留，并已完成干声/和声二次分离。"
+            elif accompaniment_enabled:
+                status_text = "> 任务完成。六轨文件已保留，并已额外生成伴奏。"
+            else:
+                status_text = "> 任务完成。已输出六轨分离结果。"
+        else:
+            status_text = f"> 批量任务完成：成功 {len(succeeded)} 个，失败 {len(failed)} 个。"
+            if failed:
+                failed_names = ", ".join(os.path.basename(item["input_file"]) for item in failed)
+                self._console_append(f"> 失败文件：{failed_names}", "warn")
+
+        self.root.after(
+            0,
+            lambda target=output_root, text=status_text: self.finish_success(target, text),
+        )
 
     def merge_accompaniment(self, target_dir, base_name):
         """将六轨中非人声音轨叠加合并为一条伴奏文件。"""
@@ -572,6 +752,8 @@ class AudioSplitterGUI:
                 continue
             ext = os.path.splitext(filename)[1].lower()
             if ext not in AUDIO_EXTENSIONS:
+                continue
+            if filename.startswith("【伴奏】"):
                 continue
             name_lower = filename.lower()
             if any(kw in name_lower for kw in vocal_keywords):
@@ -609,8 +791,7 @@ class AudioSplitterGUI:
         if not self.output_path.get():
             self.output_path.set(os.path.dirname(file))
 
-        self.btn_vocal.config(state=tk.DISABLED, text="分离中...")
-        self.btn_start.config(state=tk.DISABLED)
+        self._set_busy(True, "分离中...")
         threading.Thread(target=self._run_manual_vocal_separation, args=(file,), daemon=True).start()
 
     def _run_manual_vocal_separation(self, vocal_file):
@@ -622,17 +803,14 @@ class AudioSplitterGUI:
             self.set_status("> 手动模式：正在分离干声与和声，请耐心等待...", "#FFAA00")
             self.run_separator_command(vocal_file, output_dir, self.harmony_model_name)
 
-            self.root.after(0, lambda: self.btn_vocal.config(state=tk.NORMAL, text="手动分离人声"))
-            self.root.after(0, lambda: self.btn_start.config(state=tk.NORMAL))
+            self.root.after(0, lambda: self._set_busy(False))
             self.root.after(0, lambda d=output_dir: self.finish_success(d, "> 人声分离完成。已输出干声/和声。"))
         except Exception as e:
-            self.root.after(0, lambda: self.btn_vocal.config(state=tk.NORMAL, text="手动分离人声"))
-            self.root.after(0, lambda: self.btn_start.config(state=tk.NORMAL))
+            self.root.after(0, lambda: self._set_busy(False))
             self.root.after(0, lambda: self.finish_error(str(e)))
 
     def finish_success(self, target_dir, status_text):
-        self.btn_start.config(state=tk.NORMAL, text="开始分离")
-        self.btn_vocal.config(state=tk.NORMAL)
+        self._set_busy(False)
         self._console_append(status_text, "accent")
         
         # 跨平台打开目录
@@ -647,8 +825,7 @@ class AudioSplitterGUI:
             print(f"无法打开目录: {e}")
 
     def finish_error(self, msg):
-        self.btn_start.config(state=tk.NORMAL, text="开始分离")
-        self.btn_vocal.config(state=tk.NORMAL)
+        self._set_busy(False)
         self._console_append("> 任务中止。错误 🔴", "warn")
         
         if "CUDA out of memory" in msg:

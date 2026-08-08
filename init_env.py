@@ -230,12 +230,29 @@ def check_nvidia_gpu():
         return False
 
 
+def _format_pip_failure(description, error):
+    """把 pip 的退出结果转换成面向普通用户的排查说明。"""
+    task_name = description.rstrip(".。！!…") or "项目依赖安装"
+    return (
+        f"{task_name}未完成（pip 退出码 {error.returncode}）。\n\n"
+        "请先看上方 pip 的红色文字，并按关键词处理：\n"
+        "1. 出现 ReadTimeout、timed out 或“超时”：下载站点响应太慢，请关闭代理/VPN/下载加速器，换网络后重试。\n"
+        "2. 出现 hashes、Expected 或 Got：镜像返回的文件内容与校验值不一致。不要手动修改校验值，请关闭代理后换网络重试。\n"
+        "3. 出现 No matching distribution found 或“找不到匹配版本”：镜像暂时没有适合当前系统的安装包，请稍后重试或使用“必看说明.txt”中的离线方法。\n"
+        "4. 出现 Access is denied、Permission denied 或“拒绝访问”：请关闭占用文件的程序，并检查安全软件是否拦截。\n\n"
+        "如果只是下载速度很慢，请耐心等待；PyTorch CUDA 版安装包可能超过 2GB。请同时确认磁盘剩余空间充足。"
+    )
+
+
 def run_pip(py_exe, args, description=""):
-    """Run pip with isolation flags"""
+    """使用隔离参数运行 pip，并收口为易读的错误提示。"""
     cmd = [py_exe, "-m", "pip", "install", "--isolated", "--no-user"] + args
     if description:
         print(f"[*] {description}")
-    subprocess.run(cmd, check=True)
+    try:
+        subprocess.run(cmd, check=True)
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError(_format_pip_failure(description, e)) from e
 
 
 def install_all(py_exe, has_gpu):
@@ -280,25 +297,39 @@ def install_all(py_exe, has_gpu):
     print("[+] 所有项目依赖已安装完成。")
 
 
-if __name__ == "__main__":
+def main():
+    """执行项目专用环境初始化。"""
     print("=" * 50)
     print("  项目专用依赖安装器")
     print("  (PyTorch CUDA/CPU + audio-separator + imageio-ffmpeg + numpy 版本锁定)")
     print("=" * 50)
 
-    # Isolate environment
+    # 隔离运行环境
     os.environ.pop("PYTHONPATH", None)
     os.environ.pop("PYTHONHOME", None)
     os.environ["PYTHONNOUSERSITE"] = "1"
     os.environ["PIP_USER"] = "0"
 
-    # Work from script directory
+    # 以脚本所在目录为工作目录
     os.chdir(BASE_DIR)
 
     py_exe = os.path.abspath(os.path.join(ENV_DIR, "python.exe"))
     if not os.path.exists(py_exe):
-        print(f"[-] 错误: 未找到 Python ({py_exe})。请先运行一键启动GUI.bat 完成部署。")
-        sys.exit(1)
+        raise RuntimeError(f"未找到 Python ({py_exe})。请先运行“一键启动GUI.bat”完成部署。")
 
     has_gpu = check_nvidia_gpu()
     install_all(py_exe, has_gpu)
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\n[ERROR] 部署被用户取消。下次请重新运行“一键启动GUI.bat”。")
+        sys.exit(1)
+    except Exception as e:
+        print("\n[ERROR] 环境初始化没有完成。")
+        print(f"具体原因：{e}")
+        print("\n请阅读程序目录中的“必看说明.txt”，按其中的网络、权限和离线下载建议处理。")
+        print("如果仍然失败，请提供本窗口中从 [ERROR] 开始的完整内容。")
+        sys.exit(1)

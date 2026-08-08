@@ -35,8 +35,9 @@ $InitScript    = Join-Path $BasePath "init_env.py"
 $ReqFile       = Join-Path $BasePath "requirements.txt"
 $PipMirror     = "https://mirrors.aliyun.com/pypi/simple/"
 
-# ===== PYTHON DOWNLOAD CONFIG =====
-$MirrorLatestUrl   = "https://mirrors.ustc.edu.cn/github-release/astral-sh/python-build-standalone/LatestRelease/"
+# ===== Python 下载配置 =====
+# 南京大学镜像同步 python-build-standalone 最新发行版，保持 Python 3.11 大版本不变。
+$MirrorLatestUrl   = "https://mirrors.nju.edu.cn/github-release/astral-sh/python-build-standalone/LatestRelease/"
 $ArchiveName       = $null
 $ArchiveLocal      = $null
 $ResolvedPythonVersion = $null
@@ -45,8 +46,13 @@ $ResolvedReleaseTag    = $null
 # ===== FUNCTIONS =====
 function Exit-WithError {
     param([string]$Message)
-    Write-Host "[ERROR] $Message" -ForegroundColor Red
-    Read-Host "Press Enter to exit"
+    Write-Host ""
+    Write-Host "[ERROR] 部署没有完成。" -ForegroundColor Red
+    Write-Host $Message -ForegroundColor Red
+    Write-Host ""
+    Write-Host "请先按上面的处理建议重试；仍然失败时，请把本窗口中从 [ERROR] 开始的完整内容提供给维护者。" -ForegroundColor Yellow
+    Write-Host "必读说明：$BasePath\必看说明.txt" -ForegroundColor Yellow
+    Read-Host "按 Enter 键退出"
     exit 1
 }
 
@@ -81,32 +87,73 @@ function Get-RequirementsHash {
 }
 
 function Resolve-PythonArchive {
-    Write-Host "[scan] Querying latest standalone Python mirror..." -ForegroundColor Yellow
-
-    try {
-        $resp = Invoke-WebRequest -Uri $MirrorLatestUrl -UseBasicParsing
-    }
-    catch {
-        Exit-WithError "Failed to query mirror index: $($_.Exception.Message)"
-    }
-
     $escaped = [regex]::Escape($PythonMajorMinor)
-    $pattern = "^/github-release/astral-sh/python-build-standalone/LatestRelease/cpython-($escaped\.\d+)%2B(\d+)-x86_64-pc-windows-msvc-install_only\.tar\.gz$"
+    $pattern = "^cpython-($escaped\.\d+)\+(\d+)-x86_64-pc-windows-msvc-install_only\.tar\.gz$"
     $candidates = @()
 
-    foreach ($link in $resp.Links) {
-        $href = [string]$link.href
-        if ($href -match $pattern) {
+    $local_archives = Get-ChildItem -LiteralPath $BasePath -File -Filter "cpython-$PythonMajorMinor.*-x86_64-pc-windows-msvc-install_only.tar.gz" -ErrorAction SilentlyContinue
+    foreach ($archive in $local_archives) {
+        if ($archive.Length -lt 1MB) {
+            continue
+        }
+
+        $filename = [string]$archive.Name
+        if ($filename -match $pattern) {
             $candidates += [pscustomobject]@{
-                Href       = $href
+                Href       = $null
                 Version    = $matches[1]
                 ReleaseTag = $matches[2]
+                Filename   = $filename
+                SourcePath = $archive.FullName
             }
         }
     }
 
     if (-not $candidates) {
-        Exit-WithError "Mirror does not currently provide a matching Python $PythonMajorMinor.x standalone package."
+        Write-Host "[scan] Querying latest standalone Python mirror..." -ForegroundColor Yellow
+
+        try {
+            $resp = Invoke-WebRequest -Uri $MirrorLatestUrl -UseBasicParsing
+        }
+        catch {
+            Exit-WithError (
+                "无法连接到 Python 下载站点。`n`n" +
+                "这通常是网络、代理/VPN 或安全软件暂时中断了连接，不代表 Python 已损坏。`n`n" +
+                "请按顺序尝试：`n" +
+                "1. 关闭代理、VPN 和下载加速器，然后重新双击“一键启动GUI.bat”。`n" +
+                "2. 检查安全软件是否拦截本程序访问网络；如果文件来源可信，请选择允许。`n" +
+                "3. 换用手机热点等其他网络重试。`n`n" +
+                "下载站点：$MirrorLatestUrl`n" +
+                "技术信息：$($_.Exception.Message)"
+            )
+        }
+
+        foreach ($link in $resp.Links) {
+            $href = [System.Net.WebUtility]::HtmlDecode([string]$link.href).Trim()
+            if ([string]::IsNullOrWhiteSpace($href)) {
+                continue
+            }
+
+            # 不同镜像站可能返回完整路径，也可能只返回文件名；统一按文件名匹配。
+            $filename = ($href -split '/')[-1]
+            $filename = [System.Uri]::UnescapeDataString($filename)
+            if ($filename -match $pattern) {
+                $candidates += [pscustomobject]@{
+                    Href       = $href
+                    Version    = $matches[1]
+                    ReleaseTag = $matches[2]
+                    Filename   = $filename
+                    SourcePath = $null
+                }
+            }
+        }
+    }
+
+    if (-not $candidates) {
+        Exit-WithError (
+            "下载站点暂时没有找到适用于 Windows 64 位的 Python $PythonMajorMinor.x 便携包。`n`n" +
+            "这通常是镜像同步延迟或镜像暂时异常，不是你的项目文件损坏。请稍后重新启动；如果持续出现，请按“必看说明.txt”中的离线方法准备 Python 压缩包。"
+        )
     }
 
     $best = $candidates |
@@ -124,12 +171,21 @@ function Resolve-PythonArchive {
     $script:ResolvedReleaseTag = $best.ReleaseTag
     $script:ArchiveName = "cpython-$ResolvedPythonVersion+$ResolvedReleaseTag-x86_64-pc-windows-msvc-install_only.tar.gz"
     $script:ArchiveLocal = Join-Path $RuntimeRoot $ArchiveName
+    $archiveUri = $null
+    if ($best.Href) {
+        $archiveUri = [System.Uri]::new([System.Uri]$MirrorLatestUrl, $best.Href)
+    }
+
+    if ($best.SourcePath) {
+        Write-Host "[scan] Found bundled standalone Python archive: $($best.Filename)" -ForegroundColor Green
+    }
 
     return [pscustomobject]@{
         Version     = $ResolvedPythonVersion
         ReleaseTag  = $ResolvedReleaseTag
         ArchiveName = $ArchiveName
-        MirrorUrl   = "https://mirrors.ustc.edu.cn$($best.Href)"
+        SourcePath  = $best.SourcePath
+        MirrorUrl   = if ($archiveUri) { $archiveUri.AbsoluteUri } else { $null }
     }
 }
 
@@ -139,13 +195,35 @@ function Download-ResolvedArchive {
         [pscustomobject]$ResolvedInfo
     )
 
+    if ($ResolvedInfo.SourcePath) {
+        Write-Host "[1/4] Using bundled Python $($ResolvedInfo.Version) standalone..." -ForegroundColor Yellow
+        Write-Host "      Source: $($ResolvedInfo.SourcePath)" -ForegroundColor DarkGray
+
+        try {
+            Copy-Item -LiteralPath $ResolvedInfo.SourcePath -Destination $ArchiveLocal -Force
+            if ((Get-Item $ArchiveLocal).Length -lt 1MB) {
+                throw "Bundled file too small, likely incomplete"
+            }
+            Write-Host "      Bundled archive ready." -ForegroundColor Green
+            return
+        }
+        catch {
+            if (Test-Path $ArchiveLocal) { Remove-Item $ArchiveLocal -Force }
+            Exit-WithError ("Bundled Python archive failed. Check the local file.`n" +
+                "  File: $($ResolvedInfo.SourcePath)")
+        }
+    }
+
     Write-Host "[1/4] Downloading Python $($ResolvedInfo.Version) standalone (~40MB)..." -ForegroundColor Yellow
     Write-Host "      Source: $($ResolvedInfo.MirrorUrl)" -ForegroundColor DarkGray
 
     try {
         $mirrorHost = ([uri]$ResolvedInfo.MirrorUrl).Host
         $session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
-        $session.Cookies.Add((New-Object System.Net.Cookie("addr", "122.195.16.144", "/", $mirrorHost)))
+        # 中科大镜像需要线路选择 Cookie；其他镜像不发送该站点专用 Cookie。
+        if ($mirrorHost -eq "mirrors.ustc.edu.cn") {
+            $session.Cookies.Add((New-Object System.Net.Cookie("addr", "122.195.16.144", "/", $mirrorHost)))
+        }
 
         Invoke-WebRequest -Uri $ResolvedInfo.MirrorUrl -WebSession $session -OutFile $ArchiveLocal -UseBasicParsing
         if ((Get-Item $ArchiveLocal).Length -lt 1MB) {
@@ -155,10 +233,14 @@ function Download-ResolvedArchive {
     }
     catch {
         if (Test-Path $ArchiveLocal) { Remove-Item $ArchiveLocal -Force }
-        Exit-WithError ("Mirror download failed. Check your network.`n" +
-            "You can also download manually and place it here:`n" +
-            "  File: $ArchiveName`n" +
-            "  URL:  $($ResolvedInfo.MirrorUrl)")
+        Exit-WithError (
+            "Python 运行时下载失败，压缩包没有完整保存。`n`n" +
+            "常见原因是网络不稳定、代理/VPN 或安全软件中断了大文件下载。请关闭代理/VPN/下载加速器，换网络后重新启动。`n" +
+            "如果多次失败，请按“必看说明.txt”中的离线方法手动准备此文件：`n" +
+            "  文件名：$ArchiveName`n" +
+            "  下载地址：$($ResolvedInfo.MirrorUrl)`n`n" +
+            "技术信息：$($_.Exception.Message)"
+        )
     }
 }
 
@@ -266,7 +348,6 @@ namespace SparkArc {
 }
 
 # ---- Skip python deployment if already fully deployed ----
-$Resolved = Resolve-PythonArchive
 $CurrentVersion = Get-CurrentPythonVersion
 $CurrentReqHash = Get-RequirementsHash
 $StoredReqHash = $null
@@ -299,13 +380,25 @@ if (Test-Path $MarkerFile) {
     }
 }
 
-Write-Host "========================================"
-Write-Host "  Portable Python Deployer (standalone)"
-Write-Host "  Python $($Resolved.Version) | Zero registry impact"
-Write-Host "========================================"
-
 # ---- Step 1-2: Ensure python-build-standalone archive and environment ----
 $NeedsRebuild = (-not (Test-Path $PythonExe)) -or (-not $CurrentVersion) -or (-not $CurrentVersion.StartsWith("$PythonMajorMinor."))
+$Resolved = $null
+
+if ($NeedsRebuild) {
+    # 只有本地 Python 不存在或版本不匹配时，才解析 standalone 镜像。
+    $Resolved = Resolve-PythonArchive
+}
+else {
+    # 已有可用运行环境时，不需要依赖 standalone 压缩包或其镜像。
+    $script:ResolvedPythonVersion = $CurrentVersion
+    $script:ResolvedReleaseTag = "existing"
+    Write-Host "[pyloader] Local Python $CurrentVersion is usable. Skipping standalone archive resolution." -ForegroundColor Green
+}
+
+Write-Host "========================================"
+Write-Host "  Portable Python Deployer (standalone)"
+Write-Host "  Python $(if ($Resolved) { $Resolved.Version } else { $CurrentVersion }) | Zero registry impact"
+Write-Host "========================================"
 
 if ($NeedsRebuild) {
     if (Test-Path $PythonExe) {
@@ -348,7 +441,27 @@ if ($NeedsRebuild) {
     catch {
         if (Test-Path $tarTempFile)    { Remove-Item $tarTempFile -Force }
         if (Test-Path $TempExtractDir) { Remove-Item $TempExtractDir -Recurse -Force }
-        Exit-WithError "Failed to extract archive: $($_.Exception.Message)"
+        $detail = $_.Exception.Message
+        if ($detail -match "访问被拒绝|拒绝访问|Access.*denied") {
+            Exit-WithError (
+                "无法读取 Python 压缩包，Windows 拒绝了文件访问。`n`n" +
+                "常见原因是压缩包正被其他程序占用，或安全软件正在扫描/拦截它。`n`n" +
+                "请按顺序尝试：`n" +
+                "1. 关闭其他部署窗口、压缩软件和正在扫描此文件的安全软件窗口。`n" +
+                "2. 右键压缩包打开“属性”；如果看到“解除锁定”，勾选后点击“确定”。`n" +
+                "3. 如果文件来源可信，请在安全软件中允许本程序读取，或将整个项目文件夹移到普通可写目录后重试。`n" +
+                "4. 仍失败时，删除下面列出的压缩包，再重新启动；不要删除整个项目文件夹。`n`n" +
+                "文件：$ArchiveLocal`n" +
+                "技术信息：$detail"
+            )
+        }
+
+        Exit-WithError (
+            "Python 压缩包无法解压，文件可能没有下载完整或已经损坏。`n`n" +
+            "请删除下面列出的压缩包后重新启动；如果程序根目录还有同名的离线包，也请换一份完整文件。`n`n" +
+            "文件：$ArchiveLocal`n" +
+            "技术信息：$detail"
+        )
     }
 
     $ExtractedPythonDir = Join-Path $TempExtractDir "python"
@@ -358,7 +471,11 @@ if ($NeedsRebuild) {
         }
         else {
             if (Test-Path $TempExtractDir) { Remove-Item $TempExtractDir -Recurse -Force }
-            Exit-WithError "Unexpected archive structure: python.exe not found after extraction."
+            Exit-WithError (
+                "Python 压缩包已解压，但里面没有找到 python.exe。`n`n" +
+                "这通常表示下载到的文件不完整、被镜像返回成网页，或文件格式不适用。请按“必看说明.txt”重新下载并替换压缩包后重试。`n`n" +
+                "文件：$ArchiveLocal"
+            )
         }
     }
 
@@ -381,7 +498,11 @@ if (Test-Path $InitScript) {
     Write-Host "[3/4] Running init_env.py (project-specific setup)..." -ForegroundColor Yellow
     $p = Start-Process -FilePath $PythonExe -ArgumentList "-X utf8 `"$InitScript`"" -WorkingDirectory $BasePath -NoNewWindow -Wait -PassThru
     if ($p.ExitCode -ne 0) {
-        Exit-WithError "init_env.py failed with exit code $($p.ExitCode)."
+        Exit-WithError (
+            "项目依赖初始化没有完成（退出码 $($p.ExitCode)）。`n`n" +
+            "请先查看上方以 [ERROR] 开头的具体原因。常见原因包括网络超时、下载校验不一致、镜像暂时不可用或安全软件拦截。`n" +
+            "如果上方没有具体说明，请阅读“必看说明.txt”后重试。"
+        )
     }
 }
 else {
@@ -394,7 +515,11 @@ if (Test-Path $ReqFile) {
     Write-Host "[4/4] Installing requirements.txt ..." -ForegroundColor Yellow
     $p = Start-Process -FilePath $PythonExe -ArgumentList "-X utf8 -m pip install --isolated --no-user -i $PipMirror -r `"$ReqFile`"" -WorkingDirectory $BasePath -NoNewWindow -Wait -PassThru
     if ($p.ExitCode -ne 0) {
-        Exit-WithError "pip install -r requirements.txt failed with exit code $($p.ExitCode)."
+        Exit-WithError (
+            "通用依赖安装没有完成（退出码 $($p.ExitCode)）。`n`n" +
+            "请先查看上方 pip 的红色报错，并按其中的关键词处理：超时/连接中断请换网络；Expected/Got 或 hash 请关闭代理后重试；拒绝访问请检查安全软件和文件权限。`n" +
+            "如果仍然无法判断，请阅读“必看说明.txt”，再提供从 [ERROR] 开始的完整窗口内容。"
+        )
     }
 }
 else {

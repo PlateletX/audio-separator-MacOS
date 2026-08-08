@@ -5,7 +5,7 @@ set "ENV=%ROOT%.runtime\python"
 set "APP=%ROOT%app.pyw"
 "C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "%ROOT%pyloader.ps1"
 if %errorlevel% neq 0 (
-    echo [ERROR] Deployment failed!
+    echo [ERROR] 部署没有完成。请查看上方以 [ERROR] 开头的具体原因，并阅读同目录的必看说明.txt。
     pause
     exit /b 1
 )
@@ -30,6 +30,6 @@ if exist "%ENV%\pythonw.exe" (
 
 "%ENV%\python.exe" "%APP%"
 if %errorlevel% neq 0 (
-    echo [ERROR] App exited with an error.
+    echo [ERROR] 程序启动失败。请重新运行一键启动GUI.bat，并提供窗口中的错误内容。
     pause
 )

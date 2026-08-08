@@ -1,4 +1,5 @@
 __pycache__/
+.cloud/
 .python_env/
 _python_extract_temp/
 .runtime/
