@@ -4,10 +4,8 @@ init_env.py - Project-specific dependency installer
 Handles packages and tools that need platform detection or project-specific
 logic that should NOT live in generic pyloader.ps1:
   1. PyTorch (CUDA vs CPU auto-detection)
-  2. audio-separator (metadata says numpy>=2, but works fine with numpy 1.x)
-  3. numpy version pin (onnxruntime 1.17.x needs numpy 1.x ABI)
-  4. FFmpeg runtime via imageio-ffmpeg from domestic PyPI mirror
-  5. Model files download (HuggingFace CN mirror)
+  2. FFmpeg runtime via imageio-ffmpeg from domestic PyPI mirror
+  3. Model files download (HuggingFace CN mirror)
 
 Standard packages go in requirements.txt (handled by pyloader.ps1).
 Called automatically by pyloader.ps1 during deployment.
@@ -28,14 +26,8 @@ TORCHAUDIO_VERSION = "2.4.1"
 TORCHVISION_VERSION = "0.19.1"
 CUDA_VERSION = "cu118"
 
-# Audio separator version
-AUDIO_SEPARATOR_VERSION = "0.41.1"
-
 # FFmpeg runtime version (domestic PyPI mirror)
 IMAGEIO_FFMPEG_VERSION = "0.6.0"
-
-# NumPy constraint (onnxruntime 1.17.x was compiled against numpy 1.x ABI)
-NUMPY_CONSTRAINT = "numpy>=1.21.6,<2.0"
 
 # Download mirrors
 MIRROR_URL = "https://mirrors.aliyun.com/pypi/simple/"
@@ -277,21 +269,11 @@ def install_all(py_exe, has_gpu):
         torch_args += ["--extra-index-url", TORCH_CPU_INDEX]
         run_pip(py_exe, torch_args, f"正在安装 PyTorch {TORCH_VERSION}+cpu (CPU版)...")
 
-    # Step 3: Install audio-separator (pulls in numpy 2.x via its dependency)
-    run_pip(py_exe, ["-i", MIRROR_URL, f"audio-separator=={AUDIO_SEPARATOR_VERSION}"],
-            f"正在安装 audio-separator {AUDIO_SEPARATOR_VERSION}...")
-
-    # Step 4: Install FFmpeg runtime from domestic PyPI mirror
+    # Step 3: Install FFmpeg runtime from domestic PyPI mirror
     run_pip(py_exe, ["-i", MIRROR_URL, f"imageio-ffmpeg=={IMAGEIO_FFMPEG_VERSION}"],
             f"正在安装 imageio-ffmpeg {IMAGEIO_FFMPEG_VERSION}...")
 
-    # Step 5: Force-downgrade numpy to 1.x (onnxruntime 1.17.x ABI requirement)
-    # audio-separator's metadata says numpy>=2 but it works fine with numpy 1.x (verified).
-    # onnxruntime-gpu 1.17.1 CRASHES with numpy 2.x due to C extension ABI mismatch.
-    run_pip(py_exe, ["-i", MIRROR_URL, NUMPY_CONSTRAINT],
-            "正在锁定 numpy<2（onnxruntime 1.17.x 兼容性要求）...")
-
-    # Step 6: Validate FFmpeg runtime after package installation
+    # Step 4: Validate FFmpeg runtime after package installation
     ensure_ffmpeg()
 
     print("[+] 所有项目依赖已安装完成。")
@@ -301,7 +283,7 @@ def main():
     """执行项目专用环境初始化。"""
     print("=" * 50)
     print("  项目专用依赖安装器")
-    print("  (PyTorch CUDA/CPU + audio-separator + imageio-ffmpeg + numpy 版本锁定)")
+    print("  (PyTorch CUDA/CPU + 音频分离库 + imageio-ffmpeg + NumPy/ONNX Runtime)")
     print("=" * 50)
 
     # 隔离运行环境

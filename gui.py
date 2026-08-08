@@ -147,9 +147,9 @@ class AudioSplitterGUI:
         self.harmony_model_name = HARMONY_MODEL_NAME
         
         self.out_format = tk.StringVar(value="WAV")
-        self.segment_size = tk.StringVar(value="512")
-        self.batch_size = tk.StringVar(value="8")
+        self.segment_size = tk.StringVar(value="自动")
         self.overlap = tk.StringVar(value="8")
+        self.autocast_enabled = tk.BooleanVar(value=True)
         
         self.hardware_info = tk.StringVar(value="正在扫描硬件...")
         self.accompaniment_mode = tk.BooleanVar(value=True)
@@ -248,37 +248,42 @@ class AudioSplitterGUI:
         preset_frame.grid(row=0, column=0, columnspan=4, sticky=tk.EW, pady=(0, 12))
         ttk.Label(preset_frame, text="快速加载算力配置:", foreground=TEXT_COLOR).pack(side=tk.LEFT, padx=(0, 15))
         
-        btn_fast = ttk.Button(preset_frame, text="⚡ 快速", command=lambda: self.apply_preset("256", "2", "4"))
+        btn_fast = ttk.Button(preset_frame, text="⚡ 快速", command=lambda: self.apply_preset("自动", "8", True))
         btn_fast.pack(side=tk.LEFT, padx=5, ipadx=8)
-        ToolTip(btn_fast, "Segment: 256 | Overlap: 4 | Batch: 4\n速度最快，适合快速提取或无CUDA设备。")
+        ToolTip(btn_fast, "自动片段 | 窗口步长 8 秒 | CUDA 自动混合精度\n窗口重叠较少，通常更快；适合先快速试跑，不代表音质更好。")
 
-        btn_bal = ttk.Button(preset_frame, text="⚖️ 均衡", command=lambda: self.apply_preset("512", "8", "8"))
+        btn_bal = ttk.Button(preset_frame, text="⚖️ 均衡", command=lambda: self.apply_preset("自动", "4", True))
         btn_bal.pack(side=tk.LEFT, padx=5, ipadx=8)
-        ToolTip(btn_bal, "Segment: 512 | Overlap: 8 | Batch: 8\n推荐日常使用，完美平衡质量与速度。")
+        ToolTip(btn_bal, "自动片段 | 窗口步长 4 秒 | CUDA 自动混合精度\n速度和窗口重叠量折中，适合日常使用；不保证音质更高。")
 
-        btn_high = ttk.Button(preset_frame, text="💎 极致 (约3.0G 显存)", command=lambda: self.apply_preset("1024", "8", "16"))
+        btn_high = ttk.Button(preset_frame, text="💎 极致", command=lambda: self.apply_preset("1024", "2", False))
         btn_high.pack(side=tk.LEFT, padx=5, ipadx=8)
-        ToolTip(btn_high, "Segment: 1024 | Overlap: 8 | Batch: 16\n捕获更宽频段，音质最高。")
+        ToolTip(btn_high, "手动片段 1024 | 窗口步长 2 秒 | 关闭自动混合精度\n实验性高负载设置：覆盖模型默认片段，窗口重叠更多，通常更慢；不保证音质更好，显存不足不要选。")
 
         # 详细参数
-        ttk.Label(param_frame, text="Segment Size:").grid(row=1, column=0, sticky=tk.W, pady=6)
-        seg_combo = ttk.Combobox(param_frame, textvariable=self.segment_size, values=["256", "512", "768", "1024"], width=12, state="readonly", font=FONT_BASE)
+        ttk.Label(param_frame, text="模型分析窗口:").grid(row=1, column=0, sticky=tk.W, pady=6)
+        seg_combo = ttk.Combobox(param_frame, textvariable=self.segment_size, values=["自动", "256", "512", "768", "1024"], width=12, state="readonly", font=FONT_BASE)
         seg_combo.grid(row=1, column=1, sticky=tk.W, padx=15, pady=6)
-        ToolTip(seg_combo, "音频频段分析块大小。数值越大，模型能看到的上下文越长，分离更精准，但显存占用线性增加。")
+        ToolTip(seg_combo, "自动：使用当前模型自带的默认值（推荐）。手动数值会覆盖默认值，用于实验。\n它不是音频时长；数值越大，单个分析窗口通常越占显存、耗时越长，可能改善部分音频，但不保证音质更好。\n显存不足时优先使用自动或较小数值。")
 
-        ttk.Label(param_frame, text="Overlap:").grid(row=1, column=2, sticky=tk.W, pady=6, padx=(20, 0))
-        ov_combo = ttk.Combobox(param_frame, textvariable=self.overlap, values=["2", "4", "8", "16"], width=12, state="readonly", font=FONT_BASE)
+        ttk.Label(param_frame, text="窗口步长（秒）:").grid(row=1, column=2, sticky=tk.W, pady=6, padx=(20, 0))
+        ov_combo = ttk.Combobox(param_frame, textvariable=self.overlap, values=["2", "4", "8"], width=12, state="readonly", font=FONT_BASE)
         ov_combo.grid(row=1, column=3, sticky=tk.W, padx=15, pady=6)
-        ToolTip(ov_combo, "段与段之间的重叠淡入淡出次数。值越大接缝伪影越少。8以上几乎无收益，且会增加处理时间。")
+        ToolTip(ov_combo, "这是相邻分析窗口起点之间的间隔，不是“重叠次数”。\n数值越小，窗口重叠越多，通常更慢，并可能减少窗口边界影响；数值越大，窗口更少，通常更快。\n它主要影响窗口数量、总耗时和窗口边界处理，不能直接降低单个窗口的峰值显存；实际步长不会超过模型自身的窗口长度。")
 
-        ttk.Label(param_frame, text="Batch Size:").grid(row=2, column=0, sticky=tk.W, pady=6)
-        batch_combo = ttk.Combobox(param_frame, textvariable=self.batch_size, values=["1", "2", "4", "8", "12", "16", "24"], width=12, state="readonly", font=FONT_BASE)
-        batch_combo.grid(row=2, column=1, sticky=tk.W, padx=15, pady=6)
-        ToolTip(batch_combo, "并发处理批次数。越大计算效率越高，对音质无影响，但会消耗显存。遇到显存耗尽时请调小。")
-
-        ttk.Label(param_frame, text="Export Format:").grid(row=2, column=2, sticky=tk.W, pady=6, padx=(20, 0))
+        ttk.Label(param_frame, text="导出格式:").grid(row=2, column=0, sticky=tk.W, pady=6)
         fmt_combo = ttk.Combobox(param_frame, textvariable=self.out_format, values=["WAV", "FLAC", "MP3"], width=12, state="readonly", font=FONT_BASE)
-        fmt_combo.grid(row=2, column=3, sticky=tk.W, padx=15, pady=6)
+        fmt_combo.grid(row=2, column=1, sticky=tk.W, padx=15, pady=6)
+
+        chk_autocast = tk.Checkbutton(
+            param_frame, text="CUDA 自动混合精度",
+            variable=self.autocast_enabled, font=FONT_BASE,
+            bg=PANEL_BG, fg=TEXT_COLOR, selectcolor="#2D2D30",
+            activebackground=PANEL_BG, activeforeground=TEXT_COLOR,
+            highlightthickness=0, relief=tk.FLAT, bd=0,
+        )
+        chk_autocast.grid(row=2, column=2, columnspan=2, sticky=tk.W, padx=(20, 0), pady=6)
+        ToolTip(chk_autocast, "仅 CUDA 设备会尝试使用 --use_autocast。开启后通常更省显存、可能更快，但效果取决于显卡，结果也可能有轻微数值差异；CPU 不使用此选项。")
 
         chk_accomp = tk.Checkbutton(
             param_frame, text="伴奏模式  (保留六轨并额外合并非人声为伴奏)",
@@ -333,11 +338,16 @@ class AudioSplitterGUI:
         hw_label = ttk.Label(bottom_frame, textvariable=self.hardware_info, style="Hardware.TLabel")
         hw_label.pack(side=tk.LEFT, padx=12, pady=4)
 
-    def apply_preset(self, segment, overlap, batch):
+    def apply_preset(self, segment, overlap, use_autocast):
         self.segment_size.set(segment)
         self.overlap.set(overlap)
-        self.batch_size.set(batch)
-        self._console_append(f"> 已加载预设: Seg={segment}, Overlap={overlap}, Batch={batch} [就绪]", "accent")
+        self.autocast_enabled.set(use_autocast)
+        segment_label = "模型默认" if segment == "自动" else f"覆盖 {segment}"
+        autocast_label = "CUDA 混合精度开" if use_autocast else "CUDA 混合精度关"
+        self._console_append(
+            f"> 已加载预设: {segment_label}, 窗口步长 {overlap} 秒, {autocast_label} [就绪]",
+            "accent",
+        )
 
     def check_hardware(self):
         info = "GPU: "
@@ -466,10 +476,19 @@ class AudioSplitterGUI:
             "--model_file_dir", model_dir,
             "--output_dir", output_dir,
             "--output_format", self.out_format.get(),
-            "--mdxc_segment_size", self.segment_size.get(),
             "--mdxc_overlap", self.overlap.get(),
-            "--mdxc_batch_size", self.batch_size.get()
         ]
+
+        # 只有手动选择片段长度时才覆盖模型 YAML 默认值。
+        if self.segment_size.get() != "自动":
+            cmd.extend([
+                "--mdxc_segment_size", self.segment_size.get(),
+                "--mdxc_override_model_segment_size",
+            ])
+
+        # CPU 不传 autocast；CUDA 下由用户开关决定是否启用。
+        if self.autocast_enabled.get() and torch is not None and torch.cuda.is_available():
+            cmd.append("--use_autocast")
 
         env = os.environ.copy()
         env["PYTHONUNBUFFERED"] = "1"
@@ -829,7 +848,7 @@ class AudioSplitterGUI:
         self._console_append("> 任务中止。错误 🔴", "warn")
         
         if "CUDA out of memory" in msg:
-            friendly_msg = "显存溢出！您的参数设置超出了当前显存容量。\n\n解决办法：\n1. 降低 Batch Size（这是最耗显存的）\n2. 尝试使用[快速]或[均衡]预设"
+            friendly_msg = "显卡在当前设置下显存不足。\n\n解决办法：\n1. 开启“CUDA 自动混合精度”（仅 CUDA 有效，通常可降低推理显存）\n2. 将“模型分析窗口”调回“自动”或选择更小的手动值\n3. 尝试使用“快速”或“均衡”预设\n\n注意：窗口步长主要影响窗口数量、总耗时和窗口边界处理，不能直接降低单个窗口的峰值显存。"
             messagebox.showerror("显存不足", friendly_msg)
         elif "模型文件损坏" in msg or "文件过小" in msg or "无法作为压缩包读取" in msg or "文件不存在" in msg:
             friendly_msg = f"模型文件异常，无法正常加载。\n\n{msg}\n\n解决方法：\n1. 关闭程序\n2. 删除提示中提到的模型文件（.ckpt）\n3. 重新启动程序，会自动重新下载"
