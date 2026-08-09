@@ -9,3 +9,4 @@ requirements_processed.txt
 *.wav
 *.flac
 promo_page/0
+.bench-params/

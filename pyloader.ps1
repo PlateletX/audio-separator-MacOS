@@ -88,7 +88,7 @@ function Get-RequirementsHash {
 
 function Resolve-PythonArchive {
     $escaped = [regex]::Escape($PythonMajorMinor)
-    $pattern = "^cpython-($escaped\.\d+)\+(\d+)-x86_64-pc-windows-msvc-install_only\.tar\.gz$"
+    $pattern = '^cpython-({0}\.\d+)\+(\d+)-x86_64-pc-windows-msvc-install_only\.tar\.gz$' -f $escaped
     $candidates = @()
 
     $local_archives = Get-ChildItem -LiteralPath $BasePath -File -Filter "cpython-$PythonMajorMinor.*-x86_64-pc-windows-msvc-install_only.tar.gz" -ErrorAction SilentlyContinue
