@@ -1,5 +1,7 @@
 # Audio Separation GUI — macOS (Apple Silicon)
 
+> 本项目 fork 自 [aideaaa/audio-separation](https://gitee.com/aideaaa/audio-separation)，并针对 macOS Apple Silicon（M1 及更新）进行了适配与整理。
+
 基于 **BS-Rofo-SW-Fixed** 的六轨分离 GUI，可输出 piano、guitar、bass、drums、vocals、other；也支持人声/和声分离、批量任务和伴奏导出。
 
 ## 支持环境
