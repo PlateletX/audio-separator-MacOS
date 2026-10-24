@@ -23,21 +23,17 @@ fi
 
 PYTHON="$(command -v python3.12 || true)"
 if [[ -z "$PYTHON" ]]; then
-  print "正在安装 Python 3.12 与 Tk 支持（Homebrew）..."
-  "$BREW" install python@3.12 python-tk@3.12
+  print "正在安装 Python 3.12..."
+  "$BREW" install python@3.12
   PYTHON="$("$BREW" --prefix python@3.12)/bin/python3.12"
 fi
 
-if ! "$PYTHON" -c 'import tkinter' >/dev/null 2>&1; then
-  print "正在安装 Python 3.12 的 Tk 支持..."
-  "$BREW" install python@3.12 python-tk@3.12
-  PYTHON="$("$BREW" --prefix python@3.12)/bin/python3.12"
-fi
-
-if ! "$PYTHON" -c 'import tkinter' >/dev/null 2>&1; then
-  print -u2 "Python 3.12 的 tkinter 不可用。请运行：brew reinstall python@3.12 python-tk@3.12"
+if [[ -z "$PYTHON" ]]; then
+  print -u2 "未找到可用的 Python 3.12。"
   exit 1
 fi
 
 "$PYTHON" macos_setup.py --python "$PYTHON"
+export QT_PLUGIN_PATH="$ROOT/.runtime/macos/lib/python3.12/site-packages/PySide6/Qt/plugins"
+export QT_QPA_PLATFORM_PLUGIN_PATH="$QT_PLUGIN_PATH/platforms"
 exec "$ROOT/.runtime/macos/bin/python" "$ROOT/app.pyw"

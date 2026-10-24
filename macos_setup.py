@@ -49,7 +49,7 @@ def runtime_is_ready(fingerprint: str) -> bool:
             [
                 str(VENV_PYTHON),
                 "-c",
-                "import audio_separator, imageio_ffmpeg, onnxruntime, tkinterdnd2, torch, torchaudio, torchvision",
+                "import audio_separator, imageio_ffmpeg, onnxruntime, torch, torchaudio, torchvision, PySide6",
             ],
             check=True,
             cwd=BASE_DIR,
@@ -74,8 +74,8 @@ def verify_runtime() -> None:
         [
             str(VENV_PYTHON),
             "-c",
-            "import tkinter; import audio_separator; import onnxruntime; import tkinterdnd2; "
-            "import imageio_ffmpeg; import torch; import torchaudio; import torchvision; "
+            "import audio_separator; import onnxruntime; import imageio_ffmpeg; "
+            "import torch; import torchaudio; import torchvision; import PySide6; "
             "print('依赖导入检查通过'); print('ONNX Runtime providers:', onnxruntime.get_available_providers())",
         ],
         cwd=BASE_DIR,
@@ -103,7 +103,6 @@ def setup(base_python: str) -> None:
     ).strip()
     if version != "3.12":
         raise RuntimeError(f"需要 Python 3.12，当前解释器版本为 {version}：{base_python}")
-    subprocess.run([base_python, "-c", "import tkinter"], check=True)
     fingerprint = requirements_fingerprint(base_python)
 
     if runtime_is_ready(fingerprint):
@@ -125,7 +124,7 @@ def setup(base_python: str) -> None:
     )
     run(
         [str(VENV_PYTHON), "-m", "pip", "install", "-r", str(REQUIREMENTS_FILE)],
-        description="安装 audio-separator、CoreML 可选运行时、FFmpeg 与 Tk 拖放依赖",
+        description="安装 audio-separator、CoreML 运行时、FFmpeg 与 PySide6 原生 GUI",
     )
     verify_runtime()
     MARKER_FILE.write_text(
@@ -137,7 +136,7 @@ def setup(base_python: str) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--python", default=sys.executable, help="Python 3.12 interpreter with tkinter")
+    parser.add_argument("--python", default=sys.executable, help="Python 3.12 interpreter")
     args = parser.parse_args()
     try:
         setup(args.python)

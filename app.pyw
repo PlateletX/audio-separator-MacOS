@@ -139,18 +139,14 @@ if __name__ == "__main__":
     # 4. 自动注册自定义模型到 audio-separator（首次运行时写入，之后跳过）
     auto_register_model()
 
-    # 5. 启动 GUI
+    # 5. 启动 Qt GUI
     try:
-        try:
-            from tkinterdnd2 import TkinterDnD
-            root = TkinterDnD.Tk()
-        except Exception:
-            # TkDnD may be missing a native library for this macOS/Python build.
-            import tkinter as tk
-            root = tk.Tk()
-        from gui import AudioSplitterGUI
-
-        app = AudioSplitterGUI(root)
-        root.mainloop()
+        # Resolve Qt plugins from the installed wheel, independent of shell PATH.
+        from PySide6.QtCore import QLibraryInfo
+        qt_plugins = QLibraryInfo.path(QLibraryInfo.PluginsPath)
+        os.environ.setdefault("QT_PLUGIN_PATH", qt_plugins)
+        os.environ.setdefault("QT_QPA_PLATFORM_PLUGIN_PATH", os.path.join(qt_plugins, "platforms"))
+        from gui_qt import main
+        main()
     except ImportError as e:
         print(f"缺少图形界面依赖: {e}")

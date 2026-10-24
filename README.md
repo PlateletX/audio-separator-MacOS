@@ -7,7 +7,7 @@
 ## 支持环境
 
 - Apple Silicon Mac（M1 或更新），macOS Sonoma 14 或更新版本。
-- Python 3.12（启动器会通过 Homebrew 准备 Python 和 Tk 支持）。
+- Python 3.12（启动器会通过 Homebrew 准备 Python）。
 - PyTorch 2.4.1 的 MPS/Metal 后端。实际速度和内存使用会因芯片、音频及模型而变化。Intel Mac 不在当前安装配置的支持范围内。
 
 ## 安装与启动
@@ -26,7 +26,7 @@ chmod u+x "启动Mac版.command"
 ./启动Mac版.command
 ```
 
-GUI 采用 macOS 风格的浅色 Frosted Glass 视觉：半透明窗口、玻璃面板、柔和边框和高对比日志区。底部显示硬件状态。Apple Silicon 可显示 Metal (MPS) 加速；CPU 也可运行，但会较慢。
+GUI 已重构为 PySide6 原生 macOS 界面：深色玻璃感面板、左侧处理设置、右侧活动日志、拖放输入和 MPS 状态提示。
 
 ## 模型及依赖
 
