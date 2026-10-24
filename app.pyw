@@ -21,8 +21,7 @@ MODEL_REGISTRATIONS = [
 def ensure_local_model_files():
     """
     启动前确保本地模型文件存在。
-    解决 pyloader 已完成后（.deploy_complete）不会再次执行 init_env.py，
-    但用户手动删除模型文件导致运行时回退网络下载失败的问题。
+    每次启动检查本地模型文件，避免模型被删除后运行时静默回退网络下载。
     """
     try:
         from init_env import ensure_model_files
@@ -142,11 +141,16 @@ if __name__ == "__main__":
 
     # 5. 启动 GUI
     try:
-        from tkinterdnd2 import TkinterDnD
+        try:
+            from tkinterdnd2 import TkinterDnD
+            root = TkinterDnD.Tk()
+        except Exception:
+            # TkDnD may be missing a native library for this macOS/Python build.
+            import tkinter as tk
+            root = tk.Tk()
         from gui import AudioSplitterGUI
-        
-        root = TkinterDnD.Tk()
+
         app = AudioSplitterGUI(root)
         root.mainloop()
-    except ImportError:
-        print("请先执行: pip install tkinterdnd2")
+    except ImportError as e:
+        print(f"缺少图形界面依赖: {e}")

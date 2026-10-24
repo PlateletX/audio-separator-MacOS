@@ -1,17 +1,22 @@
 ﻿import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
-from tkinterdnd2 import DND_FILES
 import threading
 import subprocess
 import os
 import shutil
-import ctypes
 import sys
 import locale
 import datetime
 
+from platform_support import is_mps_available
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODELS_DIR = os.path.join(BASE_DIR, "models")
+
+try:
+    from tkinterdnd2 import DND_FILES
+except ImportError:
+    DND_FILES = None
 
 
 def resolve_runtime_ffmpeg_bin():
@@ -31,9 +36,6 @@ def resolve_runtime_ffmpeg_bin():
 def resolve_audio_separator_executable():
     exe_dir = os.path.dirname(os.path.abspath(sys.executable))
     candidates = [
-        os.path.join(exe_dir, "Scripts", "audio-separator.exe"),
-        os.path.join(exe_dir, "Scripts", "audio-separator"),
-        os.path.join(exe_dir, "audio-separator.exe"),
         os.path.join(exe_dir, "audio-separator"),
         shutil.which("audio-separator"),
     ]
@@ -42,7 +44,7 @@ def resolve_audio_separator_executable():
         if candidate and os.path.exists(candidate):
             return candidate
 
-    raise RuntimeError("未找到 audio-separator 启动程序，请通过一键启动GUI.bat 启动，或重新部署环境。")
+    raise RuntimeError("未找到 audio-separator 启动程序，请通过项目启动器启动，或重新部署环境。")
 
 
 def validate_runtime_model_file(model_name):
@@ -80,10 +82,12 @@ PRIMARY_MODEL_NAME = "BS-Rofo-SW-Fixed.ckpt"
 HARMONY_MODEL_NAME = "mel_band_roformer_karaoke_aufr33_viperx_sdr_10.1956.ckpt"
 AUDIO_EXTENSIONS = {".wav", ".flac", ".mp3", ".m4a", ".ogg"}
 
-FONT_BASE = ("Microsoft YaHei UI", 13)
-FONT_BOLD = ("Microsoft YaHei UI", 13, "bold")
-FONT_TITLE = ("Microsoft YaHei UI", 15, "bold")
-FONT_CODE = ("Consolas", 13)
+FONT_FAMILY = "PingFang SC" if sys.platform == "darwin" else "Microsoft YaHei UI"
+MONO_FONT_FAMILY = "Menlo" if sys.platform == "darwin" else "Consolas"
+FONT_BASE = (FONT_FAMILY, 13)
+FONT_BOLD = (FONT_FAMILY, 13, "bold")
+FONT_TITLE = (FONT_FAMILY, 15, "bold")
+FONT_CODE = (MONO_FONT_FAMILY, 13)
 
 class ToolTip:
     def __init__(self, widget, text):
@@ -130,11 +134,12 @@ class ToolTip:
 class AudioSplitterGUI:
     def __init__(self, root):
         self.root = root
-        self.setup_dpi()
-        
         self.root.title("音轨分离")
         self.root.geometry("960x1040")
-        self.root.minsize(900, 1040)
+        self.root.minsize(
+            min(900, max(720, self.root.winfo_screenwidth() - 80)),
+            min(900, max(650, self.root.winfo_screenheight() - 100)),
+        )
         self.root.configure(bg=BG_COLOR)
         self.center_window(960, 1040)
 
@@ -149,8 +154,6 @@ class AudioSplitterGUI:
         self.out_format = tk.StringVar(value="WAV")
         self.segment_size = tk.StringVar(value="自动")
         self.overlap = tk.StringVar(value="8")
-        self.autocast_enabled = tk.BooleanVar(value=True)
-        
         self.hardware_info = tk.StringVar(value="正在扫描硬件...")
         self.accompaniment_mode = tk.BooleanVar(value=True)
 
@@ -159,12 +162,6 @@ class AudioSplitterGUI:
         
         # 异步检测硬件
         threading.Thread(target=self.check_hardware, daemon=True).start()
-
-    def setup_dpi(self):
-        try:
-            ctypes.windll.shcore.SetProcessDpiAwareness(1)
-        except Exception:
-            pass
 
     def setup_style(self):
         style = ttk.Style(self.root)
@@ -182,14 +179,14 @@ class AudioSplitterGUI:
         # 文本标签
         style.configure("TLabel", background=PANEL_BG, foreground=TEXT_COLOR, font=FONT_BASE)
         style.configure("Green.TLabel", background=BG_COLOR, foreground=ACCENT_COLOR, font=FONT_BASE)
-        style.configure("Hardware.TLabel", background=BORDER_COLOR, foreground=ACCENT_COLOR, font=("Consolas", 13), padding=6)
+        style.configure("Hardware.TLabel", background=BORDER_COLOR, foreground=ACCENT_COLOR, font=(MONO_FONT_FAMILY, 13), padding=6)
         
         # 按钮
         style.configure("TButton", font=FONT_BASE, background="#333333", foreground=TEXT_COLOR, borderwidth=1, focuscolor=ACCENT_COLOR)
         style.map("TButton", background=[("active", "#444444")], foreground=[("active", "#FFFFFF")])
         
         # 主操作按钮
-        style.configure("Primary.TButton", font=("Microsoft YaHei UI", 16, "bold"), background=ACCENT_COLOR, foreground="#000000", padding=12)
+        style.configure("Primary.TButton", font=(FONT_FAMILY, 16, "bold"), background=ACCENT_COLOR, foreground="#000000", padding=12)
         style.map("Primary.TButton", background=[("active", ACCENT_HOVER), ("disabled", "#555555")], foreground=[("disabled", "#888888")])
         
         # 下拉框和输入框
@@ -199,8 +196,11 @@ class AudioSplitterGUI:
     def center_window(self, w, h):
         sw = self.root.winfo_screenwidth()
         sh = self.root.winfo_screenheight()
-        x = (sw - w) // 2
-        y = (sh - h) // 2
+        if self.root.winfo_screenwidth() < w or self.root.winfo_screenheight() < h:
+            w = min(w, max(820, self.root.winfo_screenwidth() - 80))
+            h = min(h, max(700, self.root.winfo_screenheight() - 100))
+        x = max(0, (sw - w) // 2)
+        y = max(0, (sh - h) // 2)
         self.root.geometry(f"{w}x{h}+{x}+{y}")
 
     def setup_ui(self):
@@ -216,9 +216,10 @@ class AudioSplitterGUI:
         entry_input = ttk.Entry(file_frame, textvariable=self.input_path, width=55, font=FONT_BASE)
         entry_input.grid(row=0, column=1, padx=15, pady=4, sticky=tk.EW)
         
-        # 注册拖拽
-        entry_input.drop_target_register(DND_FILES)
-        entry_input.dnd_bind('<<Drop>>', self.handle_drop)
+        # Register drag-and-drop only when the optional TkDnD extension is installed.
+        if DND_FILES is not None and hasattr(entry_input, "drop_target_register"):
+            entry_input.drop_target_register(DND_FILES)
+            entry_input.dnd_bind('<<Drop>>', self.handle_drop)
         
         self.btn_browse_input = ttk.Button(file_frame, text="选择文件", command=self.browse_input)
         self.btn_browse_input.grid(row=0, column=2, pady=4, ipadx=5)
@@ -234,7 +235,7 @@ class AudioSplitterGUI:
             file_frame,
             textvariable=self.input_summary,
             foreground="#888888",
-            font=("Microsoft YaHei UI", 11),
+            font=(FONT_FAMILY, 11),
         ).grid(row=2, column=0, columnspan=4, sticky=tk.W, pady=(3, 0))
         
         file_frame.columnconfigure(1, weight=1)
@@ -248,17 +249,17 @@ class AudioSplitterGUI:
         preset_frame.grid(row=0, column=0, columnspan=4, sticky=tk.EW, pady=(0, 12))
         ttk.Label(preset_frame, text="快速加载算力配置:", foreground=TEXT_COLOR).pack(side=tk.LEFT, padx=(0, 15))
         
-        btn_fast = ttk.Button(preset_frame, text="⚡ 快速", command=lambda: self.apply_preset("自动", "8", True))
+        btn_fast = ttk.Button(preset_frame, text="⚡ 快速", command=lambda: self.apply_preset("自动", "8"))
         btn_fast.pack(side=tk.LEFT, padx=5, ipadx=8)
-        ToolTip(btn_fast, "自动片段 | 窗口步长 8 秒 | CUDA 自动混合精度\n窗口重叠较少，通常更快；适合先快速试跑，不代表音质更好。")
+        ToolTip(btn_fast, "自动片段 | 窗口步长 8 秒\n窗口较少，通常更快。")
 
-        btn_bal = ttk.Button(preset_frame, text="⚖️ 推荐", command=lambda: self.apply_preset("自动", "4", True))
+        btn_bal = ttk.Button(preset_frame, text="⚖️ 推荐", command=lambda: self.apply_preset("自动", "4"))
         btn_bal.pack(side=tk.LEFT, padx=5, ipadx=8)
-        ToolTip(btn_bal, "自动模型窗口 | 窗口步长 4 秒 | CUDA 自动混合精度\n速度、接缝处理和资源占用的甜点档，推荐日常使用。")
+        ToolTip(btn_bal, "自动模型窗口 | 窗口步长 4 秒\n速度和接缝处理折中，推荐日常使用。")
 
-        btn_high = ttk.Button(preset_frame, text="💎 质量优先", command=lambda: self.apply_preset("自动", "2", True))
+        btn_high = ttk.Button(preset_frame, text="💎 质量优先", command=lambda: self.apply_preset("自动", "2"))
         btn_high.pack(side=tk.LEFT, padx=5, ipadx=8)
-        ToolTip(btn_high, "自动模型窗口 | 窗口步长 2 秒 | CUDA 自动混合精度\n窗口最多、通常最慢；可能减少接缝影响，但不保证音质一定提升，显存不足不要选。")
+        ToolTip(btn_high, "自动模型窗口 | 窗口步长 2 秒\n窗口最多，通常最慢。")
 
         # 详细参数
         ttk.Label(param_frame, text="模型分析窗口:").grid(row=1, column=0, sticky=tk.W, pady=6)
@@ -274,16 +275,6 @@ class AudioSplitterGUI:
         ttk.Label(param_frame, text="导出格式:").grid(row=2, column=0, sticky=tk.W, pady=6)
         fmt_combo = ttk.Combobox(param_frame, textvariable=self.out_format, values=["WAV", "FLAC", "MP3"], width=12, state="readonly", font=FONT_BASE)
         fmt_combo.grid(row=2, column=1, sticky=tk.W, padx=15, pady=6)
-
-        chk_autocast = tk.Checkbutton(
-            param_frame, text="CUDA 自动混合精度",
-            variable=self.autocast_enabled, font=FONT_BASE,
-            bg=PANEL_BG, fg=TEXT_COLOR, selectcolor="#2D2D30",
-            activebackground=PANEL_BG, activeforeground=TEXT_COLOR,
-            highlightthickness=0, relief=tk.FLAT, bd=0,
-        )
-        chk_autocast.grid(row=2, column=2, columnspan=2, sticky=tk.W, padx=(20, 0), pady=6)
-        ToolTip(chk_autocast, "开启：CUDA 推理通常更快、更省显存，当前模型测试中输出差异很小，建议保持开启。关闭：通常更慢、更占显存，没有测出质量收益；只建议排查兼容性时尝试。CPU 不使用此选项。")
 
         chk_accomp = tk.Checkbutton(
             param_frame, text="伴奏模式  (保留六轨并额外合并非人声为伴奏)",
@@ -338,29 +329,23 @@ class AudioSplitterGUI:
         hw_label = ttk.Label(bottom_frame, textvariable=self.hardware_info, style="Hardware.TLabel")
         hw_label.pack(side=tk.LEFT, padx=12, pady=4)
 
-    def apply_preset(self, segment, overlap, use_autocast):
+    def apply_preset(self, segment, overlap):
         self.segment_size.set(segment)
         self.overlap.set(overlap)
-        self.autocast_enabled.set(use_autocast)
         segment_label = "模型默认" if segment == "自动" else f"覆盖 {segment}"
-        autocast_label = "CUDA 混合精度开" if use_autocast else "CUDA 混合精度关"
         self._console_append(
-            f"> 已加载预设: {segment_label}, 窗口步长 {overlap} 秒, {autocast_label} [就绪]",
+            f"> 已加载预设: {segment_label}, 窗口步长 {overlap} 秒 [就绪]",
             "accent",
         )
 
     def check_hardware(self):
-        info = "GPU: "
         if torch is None:
-            info += "未检测到 PyTorch 核心"
+            info = "GPU: 未检测到 PyTorch 核心"
+        elif is_mps_available(torch):
+            info = "GPU: Apple Silicon // Metal (MPS) 加速启用 ✅"
         else:
-            if torch.cuda.is_available():
-                device_name = torch.cuda.get_device_name(0)
-                vram_gb = torch.cuda.get_device_properties(0).total_memory / (1024**3)
-                info += f"NVIDIA {device_name} // {vram_gb:.1f} GB VRAM // CUDA 启用 ✅"
-            else:
-                info += "仅 CPU 运行 ❌ (未检测到Nvidia GPU或CUDA，将花费较长时间处理！)"
-        
+            info = "GPU: 仅 CPU 运行 (未检测到可用的 CUDA/MPS 加速，将花费较长时间处理)"
+
         self.root.after(0, lambda: self.hardware_info.set(info))
 
     def _set_input_files(self, paths):
@@ -486,10 +471,6 @@ class AudioSplitterGUI:
                 "--mdxc_override_model_segment_size",
             ])
 
-        # CPU 不传 autocast；CUDA 下由用户开关决定是否启用。
-        if self.autocast_enabled.get() and torch is not None and torch.cuda.is_available():
-            cmd.append("--use_autocast")
-
         env = os.environ.copy()
         env["PYTHONUNBUFFERED"] = "1"
         ffmpeg_bin = resolve_runtime_ffmpeg_bin()
@@ -518,13 +499,6 @@ class AudioSplitterGUI:
             "env": env,
             "cwd": BASE_DIR,
         }
-        if os.name == "nt":
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            startupinfo.wShowWindow = 0
-            popen_kwargs["startupinfo"] = startupinfo
-            popen_kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
-
         stderr_lines = []
         stdout_lines = []
 
@@ -847,8 +821,8 @@ class AudioSplitterGUI:
         self._set_busy(False)
         self._console_append("> 任务中止。错误 🔴", "warn")
         
-        if "CUDA out of memory" in msg:
-            friendly_msg = "显卡在当前设置下显存不足。\n\n解决办法：\n1. 开启“CUDA 自动混合精度”（通常更省显存）\n2. 将“模型分析窗口”调回“自动”或选择更小的手动值（直接降低单窗口负载）\n3. 仍不足时使用“快速”预设\n\n注意：窗口步长主要减少窗口数量和总耗时，不能解决单个窗口的峰值显存。"
+        if "out of memory" in msg.lower():
+            friendly_msg = "Metal 内存不足。\n\n解决办法：\n1. 将“模型分析窗口”调回“自动”或选择更小的值。\n2. 使用“快速”预设。\n3. 关闭其他高内存应用后重试。"
             messagebox.showerror("显存不足", friendly_msg)
         elif "模型文件损坏" in msg or "文件过小" in msg or "无法作为压缩包读取" in msg or "文件不存在" in msg:
             friendly_msg = f"模型文件异常，无法正常加载。\n\n{msg}\n\n解决方法：\n1. 关闭程序\n2. 删除提示中提到的模型文件（.ckpt）\n3. 重新启动程序，会自动重新下载"

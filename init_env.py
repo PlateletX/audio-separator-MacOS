@@ -1,56 +1,37 @@
-"""
-init_env.py - Project-specific dependency installer
-
-Handles packages and tools that need platform detection or project-specific
-logic that should NOT live in generic pyloader.ps1:
-  1. PyTorch (CUDA vs CPU auto-detection)
-  2. FFmpeg runtime via imageio-ffmpeg from domestic PyPI mirror
-  3. Model files download (HuggingFace CN mirror)
-
-Standard packages go in requirements.txt (handled by pyloader.ps1).
-Called automatically by pyloader.ps1 during deployment.
-"""
+"""Model download and FFmpeg helpers shared by the macOS application."""
 import os
 import sys
-import subprocess
 import shutil
 import urllib.request
 import urllib.error
 import ssl
 import zipfile
+import hashlib
+
+from platform_support import ffmpeg_binary_name
 
 # ============ Project-specific config ============
-# PyTorch versions
-TORCH_VERSION = "2.4.1"
-TORCHAUDIO_VERSION = "2.4.1"
-TORCHVISION_VERSION = "0.19.1"
-CUDA_VERSION = "cu118"
-
-# FFmpeg runtime version (domestic PyPI mirror)
+# FFmpeg runtime version
 IMAGEIO_FFMPEG_VERSION = "0.6.0"
-
-# Download mirrors
-MIRROR_URL = "https://mirrors.aliyun.com/pypi/simple/"
-TORCH_CUDA_INDEX = f"https://download.pytorch.org/whl/{CUDA_VERSION}"
-TORCH_ALIYUN_INDEX = f"https://mirrors.aliyun.com/pytorch-wheels/{CUDA_VERSION}/"
-TORCH_CPU_INDEX = "https://download.pytorch.org/whl/cpu"
 
 # Model files (project-specific)
 # Keep local filenames consistent with original upstream names.
 MODEL_FILES = {
     "BS-Rofo-SW-Fixed.ckpt": {
         "urls": [
-            "https://huggingface.co/jarredou/BS-ROFO-SW-Fixed/blob/main/BS-Rofo-SW-Fixed.ckpt",
+            "https://huggingface.co/enerjazzer/BS-ROFO-SW-Fixed/resolve/main/BS-Rofo-SW-Fixed.ckpt?download=true",
+            "https://huggingface.co/FractalSurfer/BS-RoFormer-SW-6stem/resolve/main/BS-Rofo-SW-Fixed.ckpt?download=true",
         ],
         "min_size_bytes": 600000000,
-        "require_zip": True,
+        "sha256": "24e7d35ee9c64415673d3fd33e06a67cac2c103c5df6267ba1576459c775916e",
     },
     "mel_band_roformer_karaoke_aufr33_viperx_sdr_10.1956.ckpt": {
         "urls": [
-            "https://github.com/TRvlvr/model_repo/releases/download/all_public_uvr_models/mel_band_roformer_karaoke_aufr33_viperx_sdr_10.1956.ckpt",
+            "https://huggingface.co/Sucial/MSST-WebUI/resolve/main/All_Models/vocal_models/model_mel_band_roformer_karaoke_aufr33_viperx_sdr_10.1956.ckpt?download=true",
+            "https://huggingface.co/Derur/UVR-models/resolve/279480b466747a114c2fb166d308bca3ae4e3d6d/mel_band_roformer_karaoke_aufr33_viperx_sdr_10/mel_band_roformer_karaoke_aufr33_viperx_sdr_10.1956.ckpt?download=true",
         ],
         "min_size_bytes": 800000000,
-        "require_zip": True,
+        "sha256": "1de20d459332fe8869aeb01327a31df0032262706e1365114e852dc271779813",
     },
 }
 # =================================================
@@ -59,7 +40,7 @@ ENV_DIR = ".runtime/python"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODELS_DIR = os.path.join(BASE_DIR, "models")
 FFMPEG_RUNTIME_DIR = os.path.join(BASE_DIR, ".runtime", "ffmpeg")
-FFMPEG_RUNTIME_EXE = os.path.join(FFMPEG_RUNTIME_DIR, "ffmpeg.exe")
+FFMPEG_RUNTIME_EXE = os.path.join(FFMPEG_RUNTIME_DIR, ffmpeg_binary_name(sys.platform))
 
 
 def _to_hf_resolve_url(url: str) -> str:
@@ -73,17 +54,19 @@ def _to_hf_mirror_url(url: str) -> str:
     return resolve_url.replace("https://huggingface.co", "https://hf-mirror.com")
 
 
-def _download_file(url: str, target_path: str, timeout: int = 120):
-    """Download file with SSL fallback for some Windows machines lacking CA chain."""
+def _download_file(url: str, target_path: str, timeout: int = 600):
+    """Download a model file, retrying without certificate verification if needed."""
     req = urllib.request.Request(
         url,
-        headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"},
+        headers={"User-Agent": "audio-separation-macos"},
     )
 
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp, open(target_path, "wb") as f:
             shutil.copyfileobj(resp, f)
         return
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(f"HTTP {e.code}: {e.reason}") from e
     except urllib.error.URLError as e:
         is_cert_error = isinstance(e.reason, ssl.SSLCertVerificationError)
         if not is_cert_error:
@@ -102,9 +85,12 @@ def ensure_model_files():
         source_urls = file_info["urls"]
         min_size_bytes = file_info.get("min_size_bytes", 1)
         require_zip = file_info.get("require_zip", False)
+        expected_sha256 = file_info.get("sha256")
         local_path = os.path.join(MODELS_DIR, filename)
 
-        is_valid, invalid_reason = validate_model_file(local_path, min_size_bytes, require_zip)
+        is_valid, invalid_reason = validate_model_file(
+            local_path, min_size_bytes, require_zip, expected_sha256
+        )
         if is_valid:
             print(f"[+] 模型文件已存在，跳过: {filename}")
             continue
@@ -128,7 +114,9 @@ def ensure_model_files():
             print(f"    下载源: {url}")
             try:
                 _download_file(url, local_path)
-                is_valid, invalid_reason = validate_model_file(local_path, min_size_bytes, require_zip)
+                is_valid, invalid_reason = validate_model_file(
+                    local_path, min_size_bytes, require_zip, expected_sha256
+                )
                 if not is_valid:
                     raise RuntimeError(f"下载的模型文件无效: {invalid_reason}")
                 downloaded = True
@@ -141,11 +129,11 @@ def ensure_model_files():
 
         if not downloaded:
             raise RuntimeError(
-                f"模型下载失败: {filename}。请手动下载并放入程序目录，下载地址: {source_urls[0]}"
+                f"模型下载失败: {filename}。请手动下载并放入 models 目录。下载地址: {source_urls[0]}"
             )
 
 
-def validate_model_file(path, min_size_bytes=1, require_zip=False):
+def validate_model_file(path, min_size_bytes=1, require_zip=False, expected_sha256=None):
     if not os.path.exists(path):
         return False, "文件不存在"
 
@@ -164,6 +152,18 @@ def validate_model_file(path, min_size_bytes=1, require_zip=False):
                     return False, "压缩包内容为空"
         except Exception as e:
             return False, f"模型文件损坏，无法作为压缩包读取: {e}"
+
+    if expected_sha256:
+        digest = hashlib.sha256()
+        try:
+            with open(path, "rb") as model_file:
+                for block in iter(lambda: model_file.read(1024 * 1024), b""):
+                    digest.update(block)
+        except OSError as e:
+            return False, f"无法校验模型文件: {e}"
+        actual_sha256 = digest.hexdigest()
+        if actual_sha256 != expected_sha256:
+            return False, f"SHA-256 校验失败 ({actual_sha256})"
 
     return True, ""
 
@@ -199,119 +199,3 @@ def ensure_ffmpeg():
 
     print(f"[+] 正在使用 imageio-ffmpeg 运行时: {FFMPEG_RUNTIME_EXE}")
     return FFMPEG_RUNTIME_EXE
-
-
-def check_nvidia_gpu():
-    """Detect NVIDIA GPU presence"""
-    try:
-        system_root = os.environ.get("SystemRoot", r"C:\Windows")
-        ps_exe = os.path.join(system_root, "System32", "WindowsPowerShell", "v1.0", "powershell.exe")
-        if not os.path.exists(ps_exe):
-            ps_exe = shutil.which("pwsh") or shutil.which("powershell") or "powershell"
-
-        cmd = f'"{ps_exe}" -Command "Get-CimInstance win32_VideoController | Select-Object -ExpandProperty Name"'
-        output = subprocess.check_output(cmd, shell=True).decode('utf-8', errors='ignore')
-        if "NVIDIA" in output.upper():
-            print("[+] 检测到 NVIDIA 显卡，将安装 CUDA 版 PyTorch。")
-            return True
-        else:
-            print("[-] 未检测到 NVIDIA 显卡，将安装 CPU 版 PyTorch。")
-            return False
-    except Exception as e:
-        print(f"[-] 显卡检测失败 ({e})，默认安装 CPU 版 PyTorch。")
-        return False
-
-
-def _format_pip_failure(description, error):
-    """把 pip 的退出结果转换成面向普通用户的排查说明。"""
-    task_name = description.rstrip(".。！!…") or "项目依赖安装"
-    return (
-        f"{task_name}未完成（pip 退出码 {error.returncode}）。\n\n"
-        "请先看上方 pip 的红色文字，并按关键词处理：\n"
-        "1. 出现 ReadTimeout、timed out 或“超时”：下载站点响应太慢，请关闭代理/VPN/下载加速器，换网络后重试。\n"
-        "2. 出现 hashes、Expected 或 Got：镜像返回的文件内容与校验值不一致。不要手动修改校验值，请关闭代理后换网络重试。\n"
-        "3. 出现 No matching distribution found 或“找不到匹配版本”：镜像暂时没有适合当前系统的安装包，请稍后重试或使用“必看说明.txt”中的离线方法。\n"
-        "4. 出现 Access is denied、Permission denied 或“拒绝访问”：请关闭占用文件的程序，并检查安全软件是否拦截。\n\n"
-        "如果只是下载速度很慢，请耐心等待；PyTorch CUDA 版安装包可能超过 2GB。请同时确认磁盘剩余空间充足。"
-    )
-
-
-def run_pip(py_exe, args, description=""):
-    """使用隔离参数运行 pip，并收口为易读的错误提示。"""
-    cmd = [py_exe, "-m", "pip", "install", "--isolated", "--no-user"] + args
-    if description:
-        print(f"[*] {description}")
-    try:
-        subprocess.run(cmd, check=True)
-    except subprocess.CalledProcessError as e:
-        raise RuntimeError(_format_pip_failure(description, e)) from e
-
-
-def install_all(py_exe, has_gpu):
-    """Install all project-specific packages in the correct order"""
-
-    # Step 1: Ensure model files for this project
-    ensure_model_files()
-
-    # Step 2: Install PyTorch with CUDA/CPU suffix
-    suffix = f"+{CUDA_VERSION}" if has_gpu else "+cpu"
-    torch_pkgs = [
-        f"torch=={TORCH_VERSION}{suffix}",
-        f"torchaudio=={TORCHAUDIO_VERSION}{suffix}",
-        f"torchvision=={TORCHVISION_VERSION}{suffix}",
-    ]
-
-    torch_args = ["-i", MIRROR_URL] + torch_pkgs
-    if has_gpu:
-        torch_args += ["--find-links", TORCH_ALIYUN_INDEX]
-        run_pip(py_exe, torch_args, f"正在安装 PyTorch {TORCH_VERSION}+{CUDA_VERSION} (CUDA版)...")
-    else:
-        torch_args += ["--extra-index-url", TORCH_CPU_INDEX]
-        run_pip(py_exe, torch_args, f"正在安装 PyTorch {TORCH_VERSION}+cpu (CPU版)...")
-
-    # Step 3: Install FFmpeg runtime from domestic PyPI mirror
-    run_pip(py_exe, ["-i", MIRROR_URL, f"imageio-ffmpeg=={IMAGEIO_FFMPEG_VERSION}"],
-            f"正在安装 imageio-ffmpeg {IMAGEIO_FFMPEG_VERSION}...")
-
-    # Step 4: Validate FFmpeg runtime after package installation
-    ensure_ffmpeg()
-
-    print("[+] 所有项目依赖已安装完成。")
-
-
-def main():
-    """执行项目专用环境初始化。"""
-    print("=" * 50)
-    print("  项目专用依赖安装器")
-    print("  (PyTorch CUDA/CPU + 音频分离库 + imageio-ffmpeg + NumPy/ONNX Runtime)")
-    print("=" * 50)
-
-    # 隔离运行环境
-    os.environ.pop("PYTHONPATH", None)
-    os.environ.pop("PYTHONHOME", None)
-    os.environ["PYTHONNOUSERSITE"] = "1"
-    os.environ["PIP_USER"] = "0"
-
-    # 以脚本所在目录为工作目录
-    os.chdir(BASE_DIR)
-
-    py_exe = os.path.abspath(os.path.join(ENV_DIR, "python.exe"))
-    if not os.path.exists(py_exe):
-        raise RuntimeError(f"未找到 Python ({py_exe})。请先运行“一键启动GUI.bat”完成部署。")
-
-    has_gpu = check_nvidia_gpu()
-    install_all(py_exe, has_gpu)
-
-
-if __name__ == "__main__":
-    try:
-        main()
-    except KeyboardInterrupt:
-        print("\n[ERROR] 部署被用户取消。下次请重新运行“一键启动GUI.bat”。")
-        sys.exit(1)
-    except Exception as e:
-        print("\n[ERROR] 环境初始化没有完成。")
-        print(f"具体原因：{e}")
-        print("\n请阅读程序目录中的“必看说明.txt”，按其中的网络、权限和离线下载建议处理。")
-        print("如果仍然失败，请提供本窗口中从 [ERROR] 开始的完整内容。")
-        sys.exit(1)

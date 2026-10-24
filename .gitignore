@@ -1,4 +1,6 @@
 __pycache__/
+*.py[cod]
+.DS_Store
 .cloud/
 .python_env/
 _python_extract_temp/
@@ -8,5 +10,7 @@ requirements_processed.txt
 *.ckpt
 *.wav
 *.flac
+.venv/
+venv/
 promo_page/0
 .bench-params/

@@ -1,0 +1,5 @@
+audio-separator==0.44.5
+numpy>=2,<3
+onnxruntime>=1.17,<2
+imageio-ffmpeg==0.6.0
+tkinterdnd2==0.6.4
