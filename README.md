@@ -16,6 +16,8 @@
 2. 在 Finder 中打开项目文件夹，双击 `启动Mac版.command`。
 3. 首次启动会创建 `.runtime/macos` 隔离环境并安装项目依赖。随后会检查模型文件；缺失的 `.ckpt` 权重会下载到 `models/`，需要稳定网络和足够的磁盘空间。
 
+模型下载会显示百分比、速度和预计剩余时间，并写入 `.part` 临时文件。下载中断后再次启动会尝试从上次位置继续；下载完成后会执行 SHA-256 校验。
+
 如 Finder 未能启动脚本，打开“终端”，执行：
 
 ```bash
@@ -24,7 +26,7 @@ chmod u+x "启动Mac版.command"
 ./启动Mac版.command
 ```
 
-GUI 底部显示硬件状态。Apple Silicon 可显示 Metal (MPS) 加速；CPU 也可运行，但会较慢。界面的 CUDA 混合精度选项仅供 NVIDIA CUDA 使用，不会在 MPS 或 CPU 下启用。
+GUI 采用 macOS 风格的浅色 Frosted Glass 视觉：半透明窗口、玻璃面板、柔和边框和高对比日志区。底部显示硬件状态。Apple Silicon 可显示 Metal (MPS) 加速；CPU 也可运行，但会较慢。
 
 ## 模型及依赖
 

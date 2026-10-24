@@ -7,6 +7,7 @@ import urllib.error
 import ssl
 import zipfile
 import hashlib
+import time
 
 from platform_support import ffmpeg_binary_name
 
@@ -55,15 +56,63 @@ def _to_hf_mirror_url(url: str) -> str:
 
 
 def _download_file(url: str, target_path: str, timeout: int = 600):
-    """Download a model file, retrying without certificate verification if needed."""
+    """Download with a terminal progress bar and resumable partial files."""
+    partial_path = f"{target_path}.part"
+    downloaded = os.path.getsize(partial_path) if os.path.exists(partial_path) else 0
     req = urllib.request.Request(
         url,
-        headers={"User-Agent": "audio-separation-macos"},
+        headers={
+            "User-Agent": "audio-separation-macos",
+            **({"Range": f"bytes={downloaded}-"} if downloaded else {}),
+        },
     )
 
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp, open(target_path, "wb") as f:
-            shutil.copyfileobj(resp, f)
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            if downloaded and resp.status != 206:
+                downloaded = 0
+                resp.close()
+                if os.path.exists(partial_path):
+                    os.remove(partial_path)
+                return _download_file(url, target_path, timeout)
+
+            total = resp.headers.get("Content-Length")
+            total = int(total) + downloaded if total and resp.status == 206 else int(total or 0)
+            mode = "ab" if downloaded else "wb"
+            started = time.monotonic()
+            last_update = 0.0
+            with open(partial_path, mode) as f:
+                while True:
+                    block = resp.read(1024 * 1024)
+                    if not block:
+                        break
+                    f.write(block)
+                    downloaded += len(block)
+                    now = time.monotonic()
+                    if now - last_update >= 0.25:
+                        elapsed = max(now - started, 0.001)
+                        speed = downloaded / elapsed
+                        if total:
+                            percent = min(downloaded / total * 100, 100)
+                            remaining = max(total - downloaded, 0) / max(speed, 1)
+                            eta = f"剩余 {remaining:.0f} 秒"
+                            print(
+                                f"\r      [{_progress_bar(percent)}] {percent:5.1f}% | "
+                                f"{_format_bytes(downloaded)} / {_format_bytes(total)} | "
+                                f"{_format_bytes(speed)}/s | {eta}",
+                                end="",
+                                flush=True,
+                            )
+                        else:
+                            print(
+                                f"\r      已下载 {_format_bytes(downloaded)} | "
+                                f"{_format_bytes(speed)}/s",
+                                end="",
+                                flush=True,
+                            )
+                        last_update = now
+            print()
+        os.replace(partial_path, target_path)
         return
     except urllib.error.HTTPError as e:
         raise RuntimeError(f"HTTP {e.code}: {e.reason}") from e
@@ -74,8 +123,23 @@ def _download_file(url: str, target_path: str, timeout: int = 600):
         print("    SSL 证书验证失败，正在跳过证书验证重试...")
 
     insecure_ctx = ssl._create_unverified_context()
-    with urllib.request.urlopen(req, timeout=timeout, context=insecure_ctx) as resp, open(target_path, "wb") as f:
+    with urllib.request.urlopen(req, timeout=timeout, context=insecure_ctx) as resp, open(partial_path, "wb") as f:
         shutil.copyfileobj(resp, f)
+    os.replace(partial_path, target_path)
+
+
+def _format_bytes(value):
+    units = ("B", "KB", "MB", "GB")
+    value = float(value)
+    for unit in units:
+        if value < 1024 or unit == units[-1]:
+            return f"{value:.1f} {unit}"
+        value /= 1024
+
+
+def _progress_bar(percent, width=24):
+    filled = int(width * percent / 100)
+    return "#" * filled + "-" * (width - filled)
 
 
 def ensure_model_files():

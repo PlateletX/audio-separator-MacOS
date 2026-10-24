@@ -62,6 +62,7 @@ def validate_runtime_model_file(model_name):
         model_path,
         file_info.get("min_size_bytes", 1),
         file_info.get("require_zip", False),
+        file_info.get("sha256"),
     )
     if not is_valid:
         raise RuntimeError(f"模型文件损坏或不完整：{model_name} ({invalid_reason})。请删除该文件后重新启动程序以自动下载。")
@@ -71,13 +72,14 @@ try:
 except ImportError:
     torch = None
 
-BG_COLOR = "#121212"         
-PANEL_BG = "#1E1E1E"         
-TEXT_COLOR = "#CCCCCC"        
-ACCENT_COLOR = "#00FFAA"     
-ACCENT_HOVER = "#00CC88"      
-BORDER_COLOR = "#333333"    
-WARN_COLOR = "#FF5555"       
+# Frosted macOS palette: cool glass, ink text, and one aqua action accent.
+BG_COLOR = "#E8EEF5"
+PANEL_BG = "#F7FAFD"
+TEXT_COLOR = "#243142"
+ACCENT_COLOR = "#167D9A"
+ACCENT_HOVER = "#0F637C"
+BORDER_COLOR = "#C8D5E2"
+WARN_COLOR = "#C94B58"
 PRIMARY_MODEL_NAME = "BS-Rofo-SW-Fixed.ckpt"
 HARMONY_MODEL_NAME = "mel_band_roformer_karaoke_aufr33_viperx_sdr_10.1956.ckpt"
 AUDIO_EXTENSIONS = {".wav", ".flac", ".mp3", ".m4a", ".ogg"}
@@ -119,8 +121,8 @@ class ToolTip:
         
         # 深色 Tooltip 样式
         label = tk.Label(tw, text=self.text, justify=tk.LEFT,
-                      background="#252526", foreground="#D4D4D4", 
-                      relief=tk.SOLID, borderwidth=1, highlightbackground=ACCENT_COLOR,
+                      background="#F7FAFD", foreground=TEXT_COLOR,
+                      relief=tk.SOLID, borderwidth=1, highlightbackground=BORDER_COLOR,
                       highlightthickness=1, highlightcolor=ACCENT_COLOR,
                       font=FONT_BASE, padx=10, pady=5)
         label.pack()
@@ -141,6 +143,11 @@ class AudioSplitterGUI:
             min(900, max(650, self.root.winfo_screenheight() - 100)),
         )
         self.root.configure(bg=BG_COLOR)
+        if sys.platform == "darwin":
+            try:
+                self.root.attributes("-alpha", 0.98)
+            except tk.TclError:
+                pass
         self.center_window(960, 1040)
 
         # 变量存储
@@ -173,25 +180,25 @@ class AudioSplitterGUI:
         style.configure("Panel.TFrame", background=PANEL_BG)
         
         # 标签框
-        style.configure("TLabelframe", background=PANEL_BG, borderwidth=1, bordercolor=BORDER_COLOR)
+        style.configure("TLabelframe", background=PANEL_BG, borderwidth=1, relief="solid", bordercolor=BORDER_COLOR)
         style.configure("TLabelframe.Label", background=PANEL_BG, foreground=ACCENT_COLOR, font=FONT_TITLE)
         
         # 文本标签
         style.configure("TLabel", background=PANEL_BG, foreground=TEXT_COLOR, font=FONT_BASE)
         style.configure("Green.TLabel", background=BG_COLOR, foreground=ACCENT_COLOR, font=FONT_BASE)
-        style.configure("Hardware.TLabel", background=BORDER_COLOR, foreground=ACCENT_COLOR, font=(MONO_FONT_FAMILY, 13), padding=6)
+        style.configure("Hardware.TLabel", background="#DDE8F1", foreground=ACCENT_COLOR, font=(MONO_FONT_FAMILY, 13), padding=6)
         
         # 按钮
-        style.configure("TButton", font=FONT_BASE, background="#333333", foreground=TEXT_COLOR, borderwidth=1, focuscolor=ACCENT_COLOR)
-        style.map("TButton", background=[("active", "#444444")], foreground=[("active", "#FFFFFF")])
+        style.configure("TButton", font=FONT_BASE, background="#FFFFFF", foreground=TEXT_COLOR, borderwidth=1, relief="flat", padding=(12, 7), focuscolor=ACCENT_COLOR)
+        style.map("TButton", background=[("active", "#E2F1F5"), ("pressed", "#D5E9EF")], foreground=[("active", ACCENT_HOVER)])
         
         # 主操作按钮
-        style.configure("Primary.TButton", font=(FONT_FAMILY, 16, "bold"), background=ACCENT_COLOR, foreground="#000000", padding=12)
-        style.map("Primary.TButton", background=[("active", ACCENT_HOVER), ("disabled", "#555555")], foreground=[("disabled", "#888888")])
+        style.configure("Primary.TButton", font=(FONT_FAMILY, 16, "bold"), background=ACCENT_COLOR, foreground="#FFFFFF", relief="flat", padding=12)
+        style.map("Primary.TButton", background=[("active", ACCENT_HOVER), ("disabled", "#AEBBC7")], foreground=[("disabled", "#EFF4F7")])
         
         # 下拉框和输入框
-        style.configure("TEntry", fieldbackground="#2D2D30", foreground="#FFFFFF", borderwidth=1, font=FONT_BASE)
-        style.configure("TCombobox", fieldbackground="#FFFFFF", foreground="#000000", selectbackground=ACCENT_COLOR, selectforeground="#000000", font=FONT_BASE)
+        style.configure("TEntry", fieldbackground="#FFFFFF", foreground=TEXT_COLOR, borderwidth=1, relief="flat", padding=7, font=FONT_BASE)
+        style.configure("TCombobox", fieldbackground="#FFFFFF", foreground=TEXT_COLOR, selectbackground="#CFEAF0", selectforeground=TEXT_COLOR, padding=5, font=FONT_BASE)
 
     def center_window(self, w, h):
         sw = self.root.winfo_screenwidth()
@@ -205,7 +212,7 @@ class AudioSplitterGUI:
 
     def setup_ui(self):
 
-        main_frame = ttk.Frame(self.root, padding=(24, 8, 24, 12))
+        main_frame = ttk.Frame(self.root, padding=(24, 18, 24, 16))
         main_frame.pack(fill=tk.BOTH, expand=True)
 
         # ================= 1. 文件区 =================
@@ -279,7 +286,7 @@ class AudioSplitterGUI:
         chk_accomp = tk.Checkbutton(
             param_frame, text="伴奏模式  (保留六轨并额外合并非人声为伴奏)",
             variable=self.accompaniment_mode, font=FONT_BASE,
-            bg=PANEL_BG, fg=TEXT_COLOR, selectcolor="#2D2D30",
+            bg=PANEL_BG, fg=TEXT_COLOR, selectcolor="#D7EAF0",
             activebackground=PANEL_BG, activeforeground=TEXT_COLOR,
             highlightthickness=0, relief=tk.FLAT, bd=0,
         )
@@ -304,12 +311,12 @@ class AudioSplitterGUI:
         ttk.Label(btn_row, text="← 可单独选择人声文件进行干声/和声分离", foreground="#666666", font=FONT_BASE).pack(side=tk.LEFT)
 
         # 终端日志框
-        terminal_frame = tk.Frame(op_frame, bg="#000000", bd=1, relief=tk.SUNKEN)
+        terminal_frame = tk.Frame(op_frame, bg="#F8FBFD", bd=1, relief=tk.SOLID, highlightbackground=BORDER_COLOR, highlightcolor=BORDER_COLOR, highlightthickness=1)
         terminal_frame.pack(fill=tk.BOTH, expand=True)
         console_scroll = tk.Scrollbar(terminal_frame)
         console_scroll.pack(side=tk.RIGHT, fill=tk.Y)
         self.console = tk.Text(
-            terminal_frame, bg="#000000", fg=ACCENT_COLOR, font=FONT_CODE,
+            terminal_frame, bg="#F8FBFD", fg="#28566B", font=FONT_CODE,
             height=12, state=tk.DISABLED, wrap=tk.WORD,
             yscrollcommand=console_scroll.set, bd=0, padx=10, pady=8,
             insertbackground=ACCENT_COLOR,
@@ -323,7 +330,7 @@ class AudioSplitterGUI:
         self._console_append("> 系统就绪。等待音频数据输入...", "accent")
 
         # ================= 底部状态栏 =================
-        bottom_frame = tk.Frame(self.root, bg=BORDER_COLOR)
+        bottom_frame = tk.Frame(self.root, bg="#DDE8F1", highlightbackground=BORDER_COLOR, highlightthickness=1)
         bottom_frame.pack(side=tk.BOTTOM, fill=tk.X)
         
         hw_label = ttk.Label(bottom_frame, textvariable=self.hardware_info, style="Hardware.TLabel")
